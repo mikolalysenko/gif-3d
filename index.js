@@ -8,6 +8,8 @@ var ndarray = require("ndarray")
 var pool = require("typedarray-pool")
 var ops = require("ndarray-ops")
 var fs = require("fs")
+var glm = require("gl-matrix")
+var mat4 = glm.mat4
 
 module.exports = createVolumeRenderer
 
@@ -25,6 +27,7 @@ function VolumeRenderer(gl, vao, faceBuf, vertBuf, shader, texture, shape) {
 	this._model = new Float32Array(16)
 	this._view = new Float32Array(16)
 	this._projection = new Float32Array(16)
+  this._worldToClip = new Float32Array(16)
 	for(var i=0; i<4; ++i) {
 		this._model[i+4*i] = this._view[i+4*i] = this._projection[i+4*i] = 1.0
 	}
@@ -48,11 +51,16 @@ var proto = VolumeRenderer.prototype
 proto.draw = function() {
 	var gl = this._gl
 	var shader = this._shader
+  
+  gl.enable(gl.CULL_FACE)
+  
+  mat4.multiply(this._worldToClip, this._view, this._model)
+  mat4.multiply(this._worldToClip, this._projection, this._worldToClip)
+  
   //this._texture.bind(0)
 	shader.bind()
-	shader.uniforms.model = this._model
-	shader.uniforms.view = this._view
-	shader.uniforms.projection = this._projection
+  shader.uniforms.worldToClip = this._worldToClip
+  shader.uniforms.clipToWorld = mat4.invert(this._worldToClip, this._worldToClip)
 	//shader.uniforms.texture = 0
 	shader.uniforms.shape = this._shape
 	this._vao.bind()
@@ -100,7 +108,7 @@ function createVolumeRenderer(gl, array) {
 		var v = 1<<((d + 2) % 3)
 		for(var s=0; s<2; ++s) {
 			var m = s << d
-			cubeFacets.push(m, m+u, m+v, m+v, m+u, m+u+v)
+			cubeFacets.push(m, m+v, m+u, m+u, m+v, m+u+v)
 			var t = u
 			u = v
 			v = t
