@@ -3,6 +3,8 @@
 var createVolumeRenderer = require("../index.js")
 var shell = require("gl-now")()
 var camera = require("game-shell-orbit-camera")(shell)
+var glm = require("gl-matrix")
+var ndarray = require("ndarray")
 
 var viewer
 
@@ -12,7 +14,7 @@ shell.on("gl-init", function() {
 })
 
 shell.on("gl-render", function() {
-
-  viewer.
-	
+  viewer.projection = glm.mat4.perspective(new Float32Array(16), Math.PI/4.0, shell.width/shell.height, 0.01, 1000.0)
+  viewer.view = camera.view()
+  viewer.draw()
 })

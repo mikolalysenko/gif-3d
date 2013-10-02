@@ -1,0 +1,47 @@
+{
+  "name": "raymarch",
+  "version": "0.0.0",
+  "description": "Volume ray marching renderer",
+  "main": "index.js",
+  "directories": {
+    "example": "example"
+  },
+  "dependencies": {
+    "gl-buffer": "~0.1.1",
+    "ndarray-ops": "~1.1.1",
+    "gl-shader": "~0.0.6",
+    "ndarray": "~1.0.8",
+    "typedarray-pool": "~0.1.1",
+    "gl-texture2d": "~0.1.4",
+    "brfs": "~0.0.8",
+    "gl-vao": "~0.0.3"
+  },
+  "devDependencies": {
+    "beefy": "~0.4.4",
+    "game-shell-orbit-camera": "~0.0.0",
+    "gl-matrix": "~2.0.0",
+    "gl-now": "~0.0.4"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "beefy example/index.js --open"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/mikolalysenko/raymarch.git"
+  },
+  "browserify": {
+    "transform": "brfs"
+  },
+  "keywords": [
+    "volume",
+    "ray",
+    "march",
+    "render"
+  ],
+  "author": "Mikola Lysenko",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mikolalysenko/raymarch/issues"
+  }
+}

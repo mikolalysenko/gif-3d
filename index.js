@@ -38,7 +38,7 @@ var proto = VolumeRenderer.prototype
 		var p = props[i]
 		Object.defineProperty(proto, p, {
 				get: new Function("return this._" + p)
-			, set: new Function("d", ["var m=this._",p,";for(var i=0;i<16;++i){m[i]=d[i]}return m")
+			, set: new Function("d", ["var m=this._",p,";for(var i=0;i<16;++i){m[i]=d[i]}return m"].join(""))
 			, enumerable: true
 		})
 	}
@@ -48,14 +48,16 @@ var proto = VolumeRenderer.prototype
 proto.draw = function() {
 	var gl = this._gl
 	var shader = this._shader
+  //this._texture.bind(0)
 	shader.bind()
 	shader.uniforms.model = this._model
 	shader.uniforms.view = this._view
 	shader.uniforms.projection = this._projection
-	shader.uniforms.texture = this._texture.bind(0)
+	//shader.uniforms.texture = 0
 	shader.uniforms.shape = this._shape
 	this._vao.bind()
-  this._vao.draw()
+  gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0)
+  this._vao.unbind()
 }
 
 proto.dispose = function() {
@@ -72,14 +74,14 @@ function createVolumeRenderer(gl, array) {
 	}
 	
 	//Unpack texture into ndarray
-	var data = pool.mallocFloat(array.shape[0] * array.shape[1] * array.shape[2])
+	var data = pool.mallocUint8(array.shape[0] * array.shape[1] * array.shape[2])
 	var gridW = array.shape[0]
 	var gridH = array.shape[1] * array.shape[2]
 	var s0 = ndarray(data, [array.shape[0], array.shape[1], array.shape[2]])
 	ops.assign(s0, array)
 	var s1 = ndarray(data, [gridW, gridH])
 	var texture = createTexture(gl, s1)
-	pool.freeFloat(data)
+	pool.free(data)
 	
 	//Create buffers for cube
 	var cubeVerts = []
@@ -106,19 +108,20 @@ function createVolumeRenderer(gl, array) {
 	}
 	
 	//Create cube VAO
-	var faceBuf = createBuffer(cubeFacets)
-	var vertBuf = createBuffer(cubeVerts)
+	var faceBuf = createBuffer(gl, gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(cubeFacets))
+	var vertBuf = createBuffer(gl, new Float32Array(cubeVerts))
 	var vao = createVAO(gl, faceBuf, [
 		{	"buffer": vertBuf,
 			"type": gl.FLOAT,
-			"size": 3
+			"size": 3,
+      "stride": 0,
+      "offset": 0,
+      "normalized": false
 		}
 	])
 	
 	//Create shader
-	var shader = createShader(gl
-		, VERT_SRC
-		, FRAG_SRC)
+	var shader = createShader(gl, VERT_SRC, FRAG_SRC)
 	shader.attributes.position.location = 0
 	
 	//Return the volume renderer object
