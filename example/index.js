@@ -8,6 +8,8 @@ var voxelize = require("voxelize")
 var bunny = require("bunny")
 var ops = require("ndarray-ops")
 
+camera.lookAt([3,0,0], [0,0,0], [0,1,0])
+
 var viewer
 
 shell.on("gl-init", function() {
