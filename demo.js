@@ -9,6 +9,8 @@ var voxelize = require("voxelize")
 var bunny = require("bunny")
 var ops = require("ndarray-ops")
 
+camera.lookAt([3,0,0], [0,0,0], [0,1,0])
+
 var viewer
 
 shell.on("gl-init", function() {
@@ -22,7 +24,7 @@ shell.on("gl-render", function() {
   viewer.view = camera.view()
   viewer.draw()
 })
-},{"../index.js":2,"game-shell-orbit-camera":3,"gl-now":4,"voxelize":5,"gl-matrix":6,"bunny":7,"ndarray-ops":8}],6:[function(require,module,exports){
+},{"../index.js":2,"gl-now":3,"game-shell-orbit-camera":4,"gl-matrix":5,"voxelize":6,"bunny":7,"ndarray-ops":8}],5:[function(require,module,exports){
 (function(){/**
  * @fileoverview gl-matrix - High performance matrix and vector operations
  * @author Brandon Jones
@@ -3295,43 +3297,7 @@ function createVolumeRenderer(gl, array) {
 	//Return the volume renderer object
 	return new VolumeRenderer(gl, vao, faceBuf, vertBuf, shader, texture, [array.shape[2], array.shape[1], array.shape[0]], [zsplit[1], zsplit[0]], [gridW, gridH])
 }
-},{"fs":9,"bit-twiddle":10,"gl-texture2d":11,"gl-shader":12,"gl-vao":13,"gl-buffer":14,"ndarray":15,"typedarray-pool":16,"ndarray-ops":8,"gl-matrix":6}],3:[function(require,module,exports){
-"use strict"
-
-var createOrbitCamera = require("orbit-camera")
-
-function attachCamera(shell) {
-  var camera = createOrbitCamera()
-  shell.on("tick", function() {
-    var ctrl   = shell.down("control")
-    var alt    = shell.down("shift")
-    var left   = shell.down("mouse-left")
-    var right  = shell.down("mouse-right")
-    var middle = shell.down("mouse-middle")
-    if(left && !ctrl && !alt) {
-      camera.rotate([shell.mouseX/shell.width-0.5, shell.mouseY/shell.height-0.5],
-                    [shell.prevMouseX/shell.width-0.5, shell.prevMouseY/shell.height-0.5])
-    }
-    if(right || (left && ctrl && !alt)) {
-      camera.pan([(shell.mouseX - shell.prevMouseX)/shell.width,
-                  (shell.mouseY - shell.prevMouseY)/shell.height])
-    }
-    if(shell.scroll[1]) {
-      camera.distance *= Math.exp(shell.scroll[1] / shell.height)
-    }
-    if(middle || (left && !ctrl && alt)) {
-      var d = shell.mouseY - shell.prevMouseY
-      if(d) {
-        camera.distance *= Math.exp(d / shell.height)
-      }
-    }
-  })
-  
-  return camera
-}
-
-module.exports = attachCamera
-},{"orbit-camera":17}],4:[function(require,module,exports){
+},{"fs":9,"gl-texture2d":10,"bit-twiddle":11,"gl-shader":12,"gl-vao":13,"gl-buffer":14,"ndarray":15,"typedarray-pool":16,"ndarray-ops":8,"gl-matrix":5}],3:[function(require,module,exports){
 "use strict"
 
 var makeGameShell = require("game-shell")
@@ -3426,7 +3392,43 @@ function createGLShell(options) {
 }
 
 module.exports = createGLShell
-},{"game-shell":18,"webglew":19}],8:[function(require,module,exports){
+},{"game-shell":17,"webglew":18}],4:[function(require,module,exports){
+"use strict"
+
+var createOrbitCamera = require("orbit-camera")
+
+function attachCamera(shell) {
+  var camera = createOrbitCamera()
+  shell.on("tick", function() {
+    var ctrl   = shell.down("control")
+    var alt    = shell.down("shift")
+    var left   = shell.down("mouse-left")
+    var right  = shell.down("mouse-right")
+    var middle = shell.down("mouse-middle")
+    if(left && !ctrl && !alt) {
+      camera.rotate([shell.mouseX/shell.width-0.5, shell.mouseY/shell.height-0.5],
+                    [shell.prevMouseX/shell.width-0.5, shell.prevMouseY/shell.height-0.5])
+    }
+    if(right || (left && ctrl && !alt)) {
+      camera.pan([(shell.mouseX - shell.prevMouseX)/shell.width,
+                  (shell.mouseY - shell.prevMouseY)/shell.height])
+    }
+    if(shell.scroll[1]) {
+      camera.distance *= Math.exp(shell.scroll[1] / shell.height)
+    }
+    if(middle || (left && !ctrl && alt)) {
+      var d = shell.mouseY - shell.prevMouseY
+      if(d) {
+        camera.distance *= Math.exp(d / shell.height)
+      }
+    }
+  })
+  
+  return camera
+}
+
+module.exports = attachCamera
+},{"orbit-camera":19}],8:[function(require,module,exports){
 "use strict"
 
 var compile = require("cwise-compiler")
@@ -3875,7 +3877,7 @@ exports.assigns = makeOp({
   funcName: "assigns" })
 
 
-},{"cwise-compiler":20}],10:[function(require,module,exports){
+},{"cwise-compiler":20}],11:[function(require,module,exports){
 /**
  * Bit twiddling hacks for JavaScript.
  *
@@ -4081,7 +4083,7 @@ exports.nextCombination = function(v) {
 }
 
 
-},{}],19:[function(require,module,exports){
+},{}],18:[function(require,module,exports){
 "use strict";
 
 var VENDOR_PREFIX = [
@@ -4117,7 +4119,7 @@ function initWebGLEW(gl) {
   return extensions;
 }
 module.exports = initWebGLEW;
-},{}],5:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 "use strict"
 
 var ndarray = require("ndarray")
@@ -5862,7 +5864,7 @@ exports.clearCache = function clearCache() {
 }
 
 })(self)
-},{"dup":36,"bit-twiddle":37}],18:[function(require,module,exports){
+},{"bit-twiddle":36,"dup":37}],17:[function(require,module,exports){
 "use strict"
 
 var EventEmitter = require("events").EventEmitter
@@ -6567,7 +6569,7 @@ function createShell(options) {
 }
 
 module.exports = createShell
-},{"events":24,"util":26,"./lib/raf-polyfill.js":27,"./lib/mousewheel-polyfill.js":28,"./lib/hrtime-polyfill.js":29,"vkey":38,"domready":39,"uniq":40,"invert-hash":41,"lower-bound":42,"iota-array":43}],21:[function(require,module,exports){
+},{"events":24,"util":26,"./lib/raf-polyfill.js":27,"./lib/mousewheel-polyfill.js":28,"./lib/hrtime-polyfill.js":29,"domready":38,"vkey":39,"uniq":40,"invert-hash":41,"lower-bound":42,"iota-array":43}],21:[function(require,module,exports){
 "use strict";
 
 var spatialGrid = require("spatial-grid");
@@ -6881,56 +6883,6 @@ function iota(n) {
 
 module.exports = iota
 },{}],36:[function(require,module,exports){
-"use strict"
-
-function dupe_array(count, value, i) {
-  var c = count[i]|0
-  if(c <= 0) {
-    return []
-  }
-  var result = new Array(c), j
-  if(i === count.length-1) {
-    for(j=0; j<c; ++j) {
-      result[j] = value
-    }
-  } else {
-    for(j=0; j<c; ++j) {
-      result[j] = dupe_array(count, value, i+1)
-    }
-  }
-  return result
-}
-
-function dupe_number(count, value) {
-  var result, i
-  result = new Array(count)
-  for(i=0; i<count; ++i) {
-    result[i] = value
-  }
-  return result
-}
-
-function dupe(count, value) {
-  if(typeof value === "undefined") {
-    value = 0
-  }
-  switch(typeof count) {
-    case "number":
-      if(count > 0) {
-        return dupe_number(count|0, value)
-      }
-    break
-    case "object":
-      if(typeof (count.length) === "number") {
-        return dupe_array(count, value, 0)
-      }
-    break
-  }
-  return []
-}
-
-module.exports = dupe
-},{}],37:[function(require,module,exports){
 /**
  * Bit twiddling hacks for JavaScript.
  *
@@ -7136,7 +7088,113 @@ exports.nextCombination = function(v) {
 }
 
 
+},{}],37:[function(require,module,exports){
+"use strict"
+
+function dupe_array(count, value, i) {
+  var c = count[i]|0
+  if(c <= 0) {
+    return []
+  }
+  var result = new Array(c), j
+  if(i === count.length-1) {
+    for(j=0; j<c; ++j) {
+      result[j] = value
+    }
+  } else {
+    for(j=0; j<c; ++j) {
+      result[j] = dupe_array(count, value, i+1)
+    }
+  }
+  return result
+}
+
+function dupe_number(count, value) {
+  var result, i
+  result = new Array(count)
+  for(i=0; i<count; ++i) {
+    result[i] = value
+  }
+  return result
+}
+
+function dupe(count, value) {
+  if(typeof value === "undefined") {
+    value = 0
+  }
+  switch(typeof count) {
+    case "number":
+      if(count > 0) {
+        return dupe_number(count|0, value)
+      }
+    break
+    case "object":
+      if(typeof (count.length) === "number") {
+        return dupe_array(count, value, 0)
+      }
+    break
+  }
+  return []
+}
+
+module.exports = dupe
 },{}],38:[function(require,module,exports){
+/*!
+  * domready (c) Dustin Diaz 2012 - License MIT
+  */
+!function (name, definition) {
+  if (typeof module != 'undefined') module.exports = definition()
+  else if (typeof define == 'function' && typeof define.amd == 'object') define(definition)
+  else this[name] = definition()
+}('domready', function (ready) {
+
+  var fns = [], fn, f = false
+    , doc = document
+    , testEl = doc.documentElement
+    , hack = testEl.doScroll
+    , domContentLoaded = 'DOMContentLoaded'
+    , addEventListener = 'addEventListener'
+    , onreadystatechange = 'onreadystatechange'
+    , readyState = 'readyState'
+    , loadedRgx = hack ? /^loaded|^c/ : /^loaded|c/
+    , loaded = loadedRgx.test(doc[readyState])
+
+  function flush(f) {
+    loaded = 1
+    while (f = fns.shift()) f()
+  }
+
+  doc[addEventListener] && doc[addEventListener](domContentLoaded, fn = function () {
+    doc.removeEventListener(domContentLoaded, fn, f)
+    flush()
+  }, f)
+
+
+  hack && doc.attachEvent(onreadystatechange, fn = function () {
+    if (/^c/.test(doc[readyState])) {
+      doc.detachEvent(onreadystatechange, fn)
+      flush()
+    }
+  })
+
+  return (ready = hack ?
+    function (fn) {
+      self != top ?
+        loaded ? fn() : fns.push(fn) :
+        function () {
+          try {
+            testEl.doScroll('left')
+          } catch (e) {
+            return setTimeout(function() { ready(fn) }, 50)
+          }
+          fn()
+        }()
+    } :
+    function (fn) {
+      loaded ? fn() : fns.push(fn)
+    })
+})
+},{}],39:[function(require,module,exports){
 (function(){var ua = typeof window !== 'undefined' ? window.navigator.userAgent : ''
   , isOSX = /OS X/.test(ua)
   , isOpera = /Opera/.test(ua)
@@ -7275,62 +7333,6 @@ for(i = 112; i < 136; ++i) {
 }
 
 })()
-},{}],39:[function(require,module,exports){
-/*!
-  * domready (c) Dustin Diaz 2012 - License MIT
-  */
-!function (name, definition) {
-  if (typeof module != 'undefined') module.exports = definition()
-  else if (typeof define == 'function' && typeof define.amd == 'object') define(definition)
-  else this[name] = definition()
-}('domready', function (ready) {
-
-  var fns = [], fn, f = false
-    , doc = document
-    , testEl = doc.documentElement
-    , hack = testEl.doScroll
-    , domContentLoaded = 'DOMContentLoaded'
-    , addEventListener = 'addEventListener'
-    , onreadystatechange = 'onreadystatechange'
-    , readyState = 'readyState'
-    , loadedRgx = hack ? /^loaded|^c/ : /^loaded|c/
-    , loaded = loadedRgx.test(doc[readyState])
-
-  function flush(f) {
-    loaded = 1
-    while (f = fns.shift()) f()
-  }
-
-  doc[addEventListener] && doc[addEventListener](domContentLoaded, fn = function () {
-    doc.removeEventListener(domContentLoaded, fn, f)
-    flush()
-  }, f)
-
-
-  hack && doc.attachEvent(onreadystatechange, fn = function () {
-    if (/^c/.test(doc[readyState])) {
-      doc.detachEvent(onreadystatechange, fn)
-      flush()
-    }
-  })
-
-  return (ready = hack ?
-    function (fn) {
-      self != top ?
-        loaded ? fn() : fns.push(fn) :
-        function () {
-          try {
-            testEl.doScroll('left')
-          } catch (e) {
-            return setTimeout(function() { ready(fn) }, 50)
-          }
-          fn()
-        }()
-    } :
-    function (fn) {
-      loaded ? fn() : fns.push(fn)
-    })
-})
 },{}],40:[function(require,module,exports){
 "use strict"
 
@@ -7592,7 +7594,7 @@ exports.faceNormals = function(faces, positions) {
 
 
 
-},{}],11:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 "use strict"
 
 var ndarray = require("ndarray")
@@ -8337,7 +8339,7 @@ var multi = require("./lib/multi_iterator.js");
 exports.MultiIterator     = multi.MultiIterator;
 exports.beginMulti        = multi.beginMulti;
 
-},{"./lib/misc.js":59,"./lib/volume.js":60,"./lib/stencil_iterator.js":61,"./lib/multi_iterator.js":62}],17:[function(require,module,exports){
+},{"./lib/misc.js":59,"./lib/volume.js":60,"./lib/stencil_iterator.js":61,"./lib/multi_iterator.js":62}],19:[function(require,module,exports){
 "use strict"
 
 var glm = require("gl-matrix")
@@ -8483,7 +8485,7 @@ function createOrbitCamera(eye, target, up) {
 
 module.exports = createOrbitCamera
 
-},{"gl-matrix":6}],22:[function(require,module,exports){
+},{"gl-matrix":5}],22:[function(require,module,exports){
 "use strict"
 
 var ndarray = require("ndarray")
@@ -8633,7 +8635,7 @@ function array2rle(offset, phase, distance) {
 }
 
 exports.array2rle = array2rle
-},{"rle-repair":63,"rle-extents":64,"rle-core":58,"ndarray":15}],54:[function(require,module,exports){
+},{"rle-core":58,"rle-repair":63,"rle-extents":64,"ndarray":15}],54:[function(require,module,exports){
 "use strict"; "use restrict";
 
 //Compares coordinates colexicographically
@@ -9102,149 +9104,7 @@ function createThunk(proc) {
 
 module.exports = createThunk
 
-},{"./compile.js":72}],55:[function(require,module,exports){
-"use strict"; "use restrict";
-
-//Import miscellaneous library
-var misc = require("./misc.js");
-
-//Import globals
-var NEGATIVE_INFINITY = misc.NEGATIVE_INFINITY;
-
-function bisect(coord, lo, hi) {
-  var coords = this.coords;
-outer_loop:
-  while (lo <= hi) {
-    var mid = (lo + hi) >> 1;
-    for(var i=2; i>=0; --i) {
-      var s = coords[i][mid] - coord[i];
-      if(s < 0) {
-        lo = mid + 1;
-        continue outer_loop;
-      } else if(s > 0) {
-        hi = mid - 1;
-        continue outer_loop;
-      }
-    }
-    return mid;
-  }
-  return Math.max(0,hi);
-}
-
-
-//Creates a dynamic volume
-function DynamicVolume(coords_, distances_, phases_) {
-  if(coords_) {
-    this.coords     = coords_;
-    this.distances  = distances_;
-    this.phases     = phases_;
-  } else {
-    this.coords     = [ [NEGATIVE_INFINITY], [NEGATIVE_INFINITY], [NEGATIVE_INFINITY] ];
-    this.distances  = [1.0];
-    this.phases     = [0];
-  }
-};
-
-//Make a copy of a dynamic volume
-DynamicVolume.prototype.clone = function() {
-  return new DynamicVolume([
-    this.coords[0].slice(0),
-    this.coords[1].slice(0),
-    this.coords[2].slice(0)
-  ],  this.distances.slice(0)
-    , this.phases.slice(0));
-}
-
-//Returns length of volume
-DynamicVolume.prototype.length = function() {
-  return this.phases.length;
-}
-
-//Pops off the last run
-DynamicVolume.prototype.pop = function() {
-  this.coords[0].pop();
-  this.coords[1].pop();
-  this.coords[2].pop();
-  this.distances.pop();
-  this.phases.pop();
-}
-
-//Appends a run to the volume
-DynamicVolume.prototype.push = function(x, y, z, dist, phase) {
-  var coords = this.coords;
-  coords[0].push(x);
-  coords[1].push(y);
-  coords[2].push(z);
-  this.distances.push(dist);
-  this.phases.push(phase);
-}
-
-//Binary search
-DynamicVolume.prototype.bisect = bisect;
-
-//Creates a volume
-DynamicVolume.prototype.toStatic = function() {
-  return new StaticVolume([
-    new Int32Array(this.coords[0]),
-    new Int32Array(this.coords[1]),
-    new Int32Array(this.coords[2])
-  ],
-  new Float32Array(this.distances),
-  new Int32Array(this.phases));
-}
-
-
-//A binary volume using typed arrays.
-//Faster access, but can't modify volume dynamically
-function StaticVolume(coords, distances, phases) {
-  if(coords) {
-    this.coords     = coords;
-    this.distances  = distances;
-    this.phases     = phases;
-  } else {
-    this.coords     = [ new Int32Array(1), new Int32Array(1), new Int32Array(1) ];
-    this.distances  = new Float32Array(1);
-    this.phases     = new Int32Array(1);
-    this.coords[0][0] = this.coords[1][0] = this.coords[2][0] = NEGATIVE_INFINITY;
-    this.distances[0] = 1.0;
-  }
-};
-
-//Make a copy of a volume
-StaticVolume.prototype.clone = function() {
-  return new StaticVolume([
-      new Int32Array(this.coords[0]),
-      new Int32Array(this.coords[1]),
-      new Int32Array(this.coords[2])
-    ],
-    new Float64Array(this.distances),
-    new Int32Array(this.phases));
-}
-
-//Returns the number of runs
-StaticVolume.prototype.length = function() {
-  return this.phases.length;
-}
-
-var ArraySlice = Array.prototype.slice;
-StaticVolume.prototype.toDynamic = function() {
-  return new DynamicVolume([
-    ArraySlice.call(this.coords[0], 0),
-    ArraySlice.call(this.coords[1], 0),
-    ArraySlice.call(this.coords[2], 0)
-  ] , ArraySlice.call(this.distances, 0)
-    , ArraySlice.call(this.phases, 0));
-}
-
-//Bisect to find run containing coord within interval
-StaticVolume.prototype.bisect = bisect;
-
-//Export data structures
-exports.StaticVolume   = StaticVolume;
-exports.DynamicVolume  = DynamicVolume;
-
-
-},{"./misc.js":54}],56:[function(require,module,exports){
+},{"./compile.js":72}],56:[function(require,module,exports){
 "use strict"; "use restrict";
 
 var misc = require("./misc.js");
@@ -9390,6 +9250,148 @@ function beginStencil(volume, stencil) {
 
 exports.StencilIterator = StencilIterator;
 exports.beginStencil    = beginStencil;
+
+},{"./misc.js":54}],55:[function(require,module,exports){
+"use strict"; "use restrict";
+
+//Import miscellaneous library
+var misc = require("./misc.js");
+
+//Import globals
+var NEGATIVE_INFINITY = misc.NEGATIVE_INFINITY;
+
+function bisect(coord, lo, hi) {
+  var coords = this.coords;
+outer_loop:
+  while (lo <= hi) {
+    var mid = (lo + hi) >> 1;
+    for(var i=2; i>=0; --i) {
+      var s = coords[i][mid] - coord[i];
+      if(s < 0) {
+        lo = mid + 1;
+        continue outer_loop;
+      } else if(s > 0) {
+        hi = mid - 1;
+        continue outer_loop;
+      }
+    }
+    return mid;
+  }
+  return Math.max(0,hi);
+}
+
+
+//Creates a dynamic volume
+function DynamicVolume(coords_, distances_, phases_) {
+  if(coords_) {
+    this.coords     = coords_;
+    this.distances  = distances_;
+    this.phases     = phases_;
+  } else {
+    this.coords     = [ [NEGATIVE_INFINITY], [NEGATIVE_INFINITY], [NEGATIVE_INFINITY] ];
+    this.distances  = [1.0];
+    this.phases     = [0];
+  }
+};
+
+//Make a copy of a dynamic volume
+DynamicVolume.prototype.clone = function() {
+  return new DynamicVolume([
+    this.coords[0].slice(0),
+    this.coords[1].slice(0),
+    this.coords[2].slice(0)
+  ],  this.distances.slice(0)
+    , this.phases.slice(0));
+}
+
+//Returns length of volume
+DynamicVolume.prototype.length = function() {
+  return this.phases.length;
+}
+
+//Pops off the last run
+DynamicVolume.prototype.pop = function() {
+  this.coords[0].pop();
+  this.coords[1].pop();
+  this.coords[2].pop();
+  this.distances.pop();
+  this.phases.pop();
+}
+
+//Appends a run to the volume
+DynamicVolume.prototype.push = function(x, y, z, dist, phase) {
+  var coords = this.coords;
+  coords[0].push(x);
+  coords[1].push(y);
+  coords[2].push(z);
+  this.distances.push(dist);
+  this.phases.push(phase);
+}
+
+//Binary search
+DynamicVolume.prototype.bisect = bisect;
+
+//Creates a volume
+DynamicVolume.prototype.toStatic = function() {
+  return new StaticVolume([
+    new Int32Array(this.coords[0]),
+    new Int32Array(this.coords[1]),
+    new Int32Array(this.coords[2])
+  ],
+  new Float32Array(this.distances),
+  new Int32Array(this.phases));
+}
+
+
+//A binary volume using typed arrays.
+//Faster access, but can't modify volume dynamically
+function StaticVolume(coords, distances, phases) {
+  if(coords) {
+    this.coords     = coords;
+    this.distances  = distances;
+    this.phases     = phases;
+  } else {
+    this.coords     = [ new Int32Array(1), new Int32Array(1), new Int32Array(1) ];
+    this.distances  = new Float32Array(1);
+    this.phases     = new Int32Array(1);
+    this.coords[0][0] = this.coords[1][0] = this.coords[2][0] = NEGATIVE_INFINITY;
+    this.distances[0] = 1.0;
+  }
+};
+
+//Make a copy of a volume
+StaticVolume.prototype.clone = function() {
+  return new StaticVolume([
+      new Int32Array(this.coords[0]),
+      new Int32Array(this.coords[1]),
+      new Int32Array(this.coords[2])
+    ],
+    new Float64Array(this.distances),
+    new Int32Array(this.phases));
+}
+
+//Returns the number of runs
+StaticVolume.prototype.length = function() {
+  return this.phases.length;
+}
+
+var ArraySlice = Array.prototype.slice;
+StaticVolume.prototype.toDynamic = function() {
+  return new DynamicVolume([
+    ArraySlice.call(this.coords[0], 0),
+    ArraySlice.call(this.coords[1], 0),
+    ArraySlice.call(this.coords[2], 0)
+  ] , ArraySlice.call(this.distances, 0)
+    , ArraySlice.call(this.phases, 0));
+}
+
+//Bisect to find run containing coord within interval
+StaticVolume.prototype.bisect = bisect;
+
+//Export data structures
+exports.StaticVolume   = StaticVolume;
+exports.DynamicVolume  = DynamicVolume;
+
 
 },{"./misc.js":54}],57:[function(require,module,exports){
 "use strict"; "use restrict";
@@ -10022,7 +10024,213 @@ MultiIterator.prototype.subiterator = function(i) {
 exports.MultiIterator  = MultiIterator;
 exports.beginMulti     = beginMulti;
 
-},{"./misc.js":59,"./stencil_iterator.js":61}],68:[function(require,module,exports){
+},{"./misc.js":59,"./stencil_iterator.js":61}],69:[function(require,module,exports){
+/**
+ * Bit twiddling hacks for JavaScript.
+ *
+ * Author: Mikola Lysenko
+ *
+ * Ported from Stanford bit twiddling hack library:
+ *    http://graphics.stanford.edu/~seander/bithacks.html
+ */
+
+"use strict"; "use restrict";
+
+//Number of bits in an integer
+var INT_BITS = 32;
+
+//Constants
+exports.INT_BITS  = INT_BITS;
+exports.INT_MAX   =  0x7fffffff;
+exports.INT_MIN   = -1<<(INT_BITS-1);
+
+//Returns -1, 0, +1 depending on sign of x
+exports.sign = function(v) {
+  return (v > 0) - (v < 0);
+}
+
+//Computes absolute value of integer
+exports.abs = function(v) {
+  var mask = v >> (INT_BITS-1);
+  return (v ^ mask) - mask;
+}
+
+//Computes minimum of integers x and y
+exports.min = function(x, y) {
+  return y ^ ((x ^ y) & -(x < y));
+}
+
+//Computes maximum of integers x and y
+exports.max = function(x, y) {
+  return x ^ ((x ^ y) & -(x < y));
+}
+
+//Checks if a number is a power of two
+exports.isPow2 = function(v) {
+  return !(v & (v-1)) && (!!v);
+}
+
+//Computes log base 2 of v
+exports.log2 = function(v) {
+  var r, shift;
+  r =     (v > 0xFFFF) << 4; v >>>= r;
+  shift = (v > 0xFF  ) << 3; v >>>= shift; r |= shift;
+  shift = (v > 0xF   ) << 2; v >>>= shift; r |= shift;
+  shift = (v > 0x3   ) << 1; v >>>= shift; r |= shift;
+  return r | (v >> 1);
+}
+
+//Computes log base 10 of v
+exports.log10 = function(v) {
+  return  (v >= 1000000000) ? 9 : (v >= 100000000) ? 8 : (v >= 10000000) ? 7 :
+          (v >= 1000000) ? 6 : (v >= 100000) ? 5 : (v >= 10000) ? 4 :
+          (v >= 1000) ? 3 : (v >= 100) ? 2 : (v >= 10) ? 1 : 0;
+}
+
+//Counts number of bits
+exports.popCount = function(v) {
+  v = v - ((v >>> 1) & 0x55555555);
+  v = (v & 0x33333333) + ((v >>> 2) & 0x33333333);
+  return ((v + (v >>> 4) & 0xF0F0F0F) * 0x1010101) >>> 24;
+}
+
+//Counts number of trailing zeros
+function countTrailingZeros(v) {
+  var c = 32;
+  v &= -v;
+  if (v) c--;
+  if (v & 0x0000FFFF) c -= 16;
+  if (v & 0x00FF00FF) c -= 8;
+  if (v & 0x0F0F0F0F) c -= 4;
+  if (v & 0x33333333) c -= 2;
+  if (v & 0x55555555) c -= 1;
+  return c;
+}
+exports.countTrailingZeros = countTrailingZeros;
+
+//Rounds to next power of 2
+exports.nextPow2 = function(v) {
+  v += v === 0;
+  --v;
+  v |= v >>> 1;
+  v |= v >>> 2;
+  v |= v >>> 4;
+  v |= v >>> 8;
+  v |= v >>> 16;
+  return v + 1;
+}
+
+//Rounds down to previous power of 2
+exports.prevPow2 = function(v) {
+  v |= v >>> 1;
+  v |= v >>> 2;
+  v |= v >>> 4;
+  v |= v >>> 8;
+  v |= v >>> 16;
+  return v - (v>>>1);
+}
+
+//Computes parity of word
+exports.parity = function(v) {
+  v ^= v >>> 16;
+  v ^= v >>> 8;
+  v ^= v >>> 4;
+  v &= 0xf;
+  return (0x6996 >>> v) & 1;
+}
+
+var REVERSE_TABLE = new Array(256);
+
+(function(tab) {
+  for(var i=0; i<256; ++i) {
+    var v = i, r = i, s = 7;
+    for (v >>>= 1; v; v >>>= 1) {
+      r <<= 1;
+      r |= v & 1;
+      --s;
+    }
+    tab[i] = (r << s) & 0xff;
+  }
+})(REVERSE_TABLE);
+
+//Reverse bits in a 32 bit word
+exports.reverse = function(v) {
+  return  (REVERSE_TABLE[ v         & 0xff] << 24) |
+          (REVERSE_TABLE[(v >>> 8)  & 0xff] << 16) |
+          (REVERSE_TABLE[(v >>> 16) & 0xff] << 8)  |
+           REVERSE_TABLE[(v >>> 24) & 0xff];
+}
+
+//Interleave bits of 2 coordinates with 16 bits.  Useful for fast quadtree codes
+exports.interleave2 = function(x, y) {
+  x &= 0xFFFF;
+  x = (x | (x << 8)) & 0x00FF00FF;
+  x = (x | (x << 4)) & 0x0F0F0F0F;
+  x = (x | (x << 2)) & 0x33333333;
+  x = (x | (x << 1)) & 0x55555555;
+
+  y &= 0xFFFF;
+  y = (y | (y << 8)) & 0x00FF00FF;
+  y = (y | (y << 4)) & 0x0F0F0F0F;
+  y = (y | (y << 2)) & 0x33333333;
+  y = (y | (y << 1)) & 0x55555555;
+
+  return x | (y << 1);
+}
+
+//Extracts the nth interleaved component
+exports.deinterleave2 = function(v, n) {
+  v = (v >>> n) & 0x55555555;
+  v = (v | (v >>> 1))  & 0x33333333;
+  v = (v | (v >>> 2))  & 0x0F0F0F0F;
+  v = (v | (v >>> 4))  & 0x00FF00FF;
+  v = (v | (v >>> 16)) & 0x000FFFF;
+  return (v << 16) >> 16;
+}
+
+
+//Interleave bits of 3 coordinates, each with 10 bits.  Useful for fast octree codes
+exports.interleave3 = function(x, y, z) {
+  x &= 0x3FF;
+  x  = (x | (x<<16)) & 4278190335;
+  x  = (x | (x<<8))  & 251719695;
+  x  = (x | (x<<4))  & 3272356035;
+  x  = (x | (x<<2))  & 1227133513;
+
+  y &= 0x3FF;
+  y  = (y | (y<<16)) & 4278190335;
+  y  = (y | (y<<8))  & 251719695;
+  y  = (y | (y<<4))  & 3272356035;
+  y  = (y | (y<<2))  & 1227133513;
+  x |= (y << 1);
+  
+  z &= 0x3FF;
+  z  = (z | (z<<16)) & 4278190335;
+  z  = (z | (z<<8))  & 251719695;
+  z  = (z | (z<<4))  & 3272356035;
+  z  = (z | (z<<2))  & 1227133513;
+  
+  return x | (z << 2);
+}
+
+//Extracts nth interleaved component of a 3-tuple
+exports.deinterleave3 = function(v, n) {
+  v = (v >>> n)       & 1227133513;
+  v = (v | (v>>>2))   & 3272356035;
+  v = (v | (v>>>4))   & 251719695;
+  v = (v | (v>>>8))   & 4278190335;
+  v = (v | (v>>>16))  & 0x3FF;
+  return (v<<22)>>22;
+}
+
+//Computes next combination in colexicographic order (this is mistakenly called nextPermutation on the bit twiddling hacks page)
+exports.nextCombination = function(v) {
+  var t = v | (v - 1);
+  return (t + 1) | (((~t & -~t) - 1) >>> (countTrailingZeros(v) + 1));
+}
+
+
+},{}],68:[function(require,module,exports){
 (function(global){"use strict";
 
 var numeric = (typeof exports === "undefined")?(function numeric() {}):(exports);
@@ -14449,212 +14657,6 @@ numeric.svd= function svd(A) {
 
 
 })(self)
-},{}],69:[function(require,module,exports){
-/**
- * Bit twiddling hacks for JavaScript.
- *
- * Author: Mikola Lysenko
- *
- * Ported from Stanford bit twiddling hack library:
- *    http://graphics.stanford.edu/~seander/bithacks.html
- */
-
-"use strict"; "use restrict";
-
-//Number of bits in an integer
-var INT_BITS = 32;
-
-//Constants
-exports.INT_BITS  = INT_BITS;
-exports.INT_MAX   =  0x7fffffff;
-exports.INT_MIN   = -1<<(INT_BITS-1);
-
-//Returns -1, 0, +1 depending on sign of x
-exports.sign = function(v) {
-  return (v > 0) - (v < 0);
-}
-
-//Computes absolute value of integer
-exports.abs = function(v) {
-  var mask = v >> (INT_BITS-1);
-  return (v ^ mask) - mask;
-}
-
-//Computes minimum of integers x and y
-exports.min = function(x, y) {
-  return y ^ ((x ^ y) & -(x < y));
-}
-
-//Computes maximum of integers x and y
-exports.max = function(x, y) {
-  return x ^ ((x ^ y) & -(x < y));
-}
-
-//Checks if a number is a power of two
-exports.isPow2 = function(v) {
-  return !(v & (v-1)) && (!!v);
-}
-
-//Computes log base 2 of v
-exports.log2 = function(v) {
-  var r, shift;
-  r =     (v > 0xFFFF) << 4; v >>>= r;
-  shift = (v > 0xFF  ) << 3; v >>>= shift; r |= shift;
-  shift = (v > 0xF   ) << 2; v >>>= shift; r |= shift;
-  shift = (v > 0x3   ) << 1; v >>>= shift; r |= shift;
-  return r | (v >> 1);
-}
-
-//Computes log base 10 of v
-exports.log10 = function(v) {
-  return  (v >= 1000000000) ? 9 : (v >= 100000000) ? 8 : (v >= 10000000) ? 7 :
-          (v >= 1000000) ? 6 : (v >= 100000) ? 5 : (v >= 10000) ? 4 :
-          (v >= 1000) ? 3 : (v >= 100) ? 2 : (v >= 10) ? 1 : 0;
-}
-
-//Counts number of bits
-exports.popCount = function(v) {
-  v = v - ((v >>> 1) & 0x55555555);
-  v = (v & 0x33333333) + ((v >>> 2) & 0x33333333);
-  return ((v + (v >>> 4) & 0xF0F0F0F) * 0x1010101) >>> 24;
-}
-
-//Counts number of trailing zeros
-function countTrailingZeros(v) {
-  var c = 32;
-  v &= -v;
-  if (v) c--;
-  if (v & 0x0000FFFF) c -= 16;
-  if (v & 0x00FF00FF) c -= 8;
-  if (v & 0x0F0F0F0F) c -= 4;
-  if (v & 0x33333333) c -= 2;
-  if (v & 0x55555555) c -= 1;
-  return c;
-}
-exports.countTrailingZeros = countTrailingZeros;
-
-//Rounds to next power of 2
-exports.nextPow2 = function(v) {
-  v += v === 0;
-  --v;
-  v |= v >>> 1;
-  v |= v >>> 2;
-  v |= v >>> 4;
-  v |= v >>> 8;
-  v |= v >>> 16;
-  return v + 1;
-}
-
-//Rounds down to previous power of 2
-exports.prevPow2 = function(v) {
-  v |= v >>> 1;
-  v |= v >>> 2;
-  v |= v >>> 4;
-  v |= v >>> 8;
-  v |= v >>> 16;
-  return v - (v>>>1);
-}
-
-//Computes parity of word
-exports.parity = function(v) {
-  v ^= v >>> 16;
-  v ^= v >>> 8;
-  v ^= v >>> 4;
-  v &= 0xf;
-  return (0x6996 >>> v) & 1;
-}
-
-var REVERSE_TABLE = new Array(256);
-
-(function(tab) {
-  for(var i=0; i<256; ++i) {
-    var v = i, r = i, s = 7;
-    for (v >>>= 1; v; v >>>= 1) {
-      r <<= 1;
-      r |= v & 1;
-      --s;
-    }
-    tab[i] = (r << s) & 0xff;
-  }
-})(REVERSE_TABLE);
-
-//Reverse bits in a 32 bit word
-exports.reverse = function(v) {
-  return  (REVERSE_TABLE[ v         & 0xff] << 24) |
-          (REVERSE_TABLE[(v >>> 8)  & 0xff] << 16) |
-          (REVERSE_TABLE[(v >>> 16) & 0xff] << 8)  |
-           REVERSE_TABLE[(v >>> 24) & 0xff];
-}
-
-//Interleave bits of 2 coordinates with 16 bits.  Useful for fast quadtree codes
-exports.interleave2 = function(x, y) {
-  x &= 0xFFFF;
-  x = (x | (x << 8)) & 0x00FF00FF;
-  x = (x | (x << 4)) & 0x0F0F0F0F;
-  x = (x | (x << 2)) & 0x33333333;
-  x = (x | (x << 1)) & 0x55555555;
-
-  y &= 0xFFFF;
-  y = (y | (y << 8)) & 0x00FF00FF;
-  y = (y | (y << 4)) & 0x0F0F0F0F;
-  y = (y | (y << 2)) & 0x33333333;
-  y = (y | (y << 1)) & 0x55555555;
-
-  return x | (y << 1);
-}
-
-//Extracts the nth interleaved component
-exports.deinterleave2 = function(v, n) {
-  v = (v >>> n) & 0x55555555;
-  v = (v | (v >>> 1))  & 0x33333333;
-  v = (v | (v >>> 2))  & 0x0F0F0F0F;
-  v = (v | (v >>> 4))  & 0x00FF00FF;
-  v = (v | (v >>> 16)) & 0x000FFFF;
-  return (v << 16) >> 16;
-}
-
-
-//Interleave bits of 3 coordinates, each with 10 bits.  Useful for fast octree codes
-exports.interleave3 = function(x, y, z) {
-  x &= 0x3FF;
-  x  = (x | (x<<16)) & 4278190335;
-  x  = (x | (x<<8))  & 251719695;
-  x  = (x | (x<<4))  & 3272356035;
-  x  = (x | (x<<2))  & 1227133513;
-
-  y &= 0x3FF;
-  y  = (y | (y<<16)) & 4278190335;
-  y  = (y | (y<<8))  & 251719695;
-  y  = (y | (y<<4))  & 3272356035;
-  y  = (y | (y<<2))  & 1227133513;
-  x |= (y << 1);
-  
-  z &= 0x3FF;
-  z  = (z | (z<<16)) & 4278190335;
-  z  = (z | (z<<8))  & 251719695;
-  z  = (z | (z<<4))  & 3272356035;
-  z  = (z | (z<<2))  & 1227133513;
-  
-  return x | (z << 2);
-}
-
-//Extracts nth interleaved component of a 3-tuple
-exports.deinterleave3 = function(v, n) {
-  v = (v >>> n)       & 1227133513;
-  v = (v | (v>>>2))   & 3272356035;
-  v = (v | (v>>>4))   & 251719695;
-  v = (v | (v>>>8))   & 4278190335;
-  v = (v | (v>>>16))  & 0x3FF;
-  return (v<<22)>>22;
-}
-
-//Computes next combination in colexicographic order (this is mistakenly called nextPermutation on the bit twiddling hacks page)
-exports.nextCombination = function(v) {
-  var t = v | (v - 1);
-  return (t + 1) | (((~t & -~t) - 1) >>> (countTrailingZeros(v) + 1));
-}
-
-
 },{}],71:[function(require,module,exports){
 (function(global){"use strict";
 
@@ -20252,6 +20254,64 @@ function closestPoint2d(V0, V1, V2, point, result) {
 
 module.exports = closestPoint2d;
 
+},{}],80:[function(require,module,exports){
+"use strict"
+
+function unique_pred(list, compare) {
+  var ptr = 1
+    , len = list.length
+    , a=list[0], b=list[0]
+  for(var i=1; i<len; ++i) {
+    b = a
+    a = list[i]
+    if(compare(a, b)) {
+      if(i === ptr) {
+        ptr++
+        continue
+      }
+      list[ptr++] = a
+    }
+  }
+  list.length = ptr
+  return list
+}
+
+function unique_eq(list) {
+  var ptr = 1
+    , len = list.length
+    , a=list[0], b = list[0]
+  for(var i=1; i<len; ++i, b=a) {
+    b = a
+    a = list[i]
+    if(a !== b) {
+      if(i === ptr) {
+        ptr++
+        continue
+      }
+      list[ptr++] = a
+    }
+  }
+  list.length = ptr
+  return list
+}
+
+function unique(list, compare, sorted) {
+  if(list.length === 0) {
+    return []
+  }
+  if(compare) {
+    if(!sorted) {
+      list.sort(compare)
+    }
+    return unique_pred(list, compare)
+  }
+  if(!sorted) {
+    list.sort()
+  }
+  return unique_eq(list)
+}
+
+module.exports = unique
 },{}],82:[function(require,module,exports){
 module.exports = [
   // current
@@ -20395,64 +20455,6 @@ module.exports = [
   , '}'
 ]
 
-},{}],80:[function(require,module,exports){
-"use strict"
-
-function unique_pred(list, compare) {
-  var ptr = 1
-    , len = list.length
-    , a=list[0], b=list[0]
-  for(var i=1; i<len; ++i) {
-    b = a
-    a = list[i]
-    if(compare(a, b)) {
-      if(i === ptr) {
-        ptr++
-        continue
-      }
-      list[ptr++] = a
-    }
-  }
-  list.length = ptr
-  return list
-}
-
-function unique_eq(list) {
-  var ptr = 1
-    , len = list.length
-    , a=list[0], b = list[0]
-  for(var i=1; i<len; ++i, b=a) {
-    b = a
-    a = list[i]
-    if(a !== b) {
-      if(i === ptr) {
-        ptr++
-        continue
-      }
-      list[ptr++] = a
-    }
-  }
-  list.length = ptr
-  return list
-}
-
-function unique(list, compare, sorted) {
-  if(list.length === 0) {
-    return []
-  }
-  if(compare) {
-    if(!sorted) {
-      list.sort(compare)
-    }
-    return unique_pred(list, compare)
-  }
-  if(!sorted) {
-    list.sort()
-  }
-  return unique_eq(list)
-}
-
-module.exports = unique
 },{}],84:[function(require,module,exports){
 module.exports = [
     'gl_Position'
@@ -20933,314 +20935,7 @@ function tokenize() {
   }
 }
 
-},{"./lib/literals":82,"./lib/operators":83,"./lib/builtins":84,"through":67}],85:[function(require,module,exports){
-module.exports = scope
-
-function scope(state) {
-  if(this.constructor !== scope)
-    return new scope(state)
-
-  this.state = state
-  this.scopes = []
-  this.current = null
-}
-
-var cons = scope
-  , proto = cons.prototype
-
-proto.enter = function(s) {
-  this.scopes.push(
-    this.current = this.state[0].scope = s || {}
-  )
-}
-
-proto.exit = function() {
-  this.scopes.pop()
-  this.current = this.scopes[this.scopes.length - 1]
-}
-
-proto.define = function(str) {
-  this.current[str] = this.state[0]
-}
-
-proto.find = function(name, fail) {
-  for(var i = this.scopes.length - 1; i > -1; --i) {
-    if(this.scopes[i].hasOwnProperty(name)) {
-      return this.scopes[i][name]
-    }
-  }
-
-  return null
-}
-
-},{}],86:[function(require,module,exports){
-var state
-  , token
-  , tokens
-  , idx
-
-var original_symbol = {
-    nud: function() { return this.children && this.children.length ? this : fail('unexpected')() }
-  , led: fail('missing operator')
-}
-
-var symbol_table = {}
-
-function itself() {
-  return this
-}
-
-symbol('(ident)').nud = itself
-symbol('(keyword)').nud = itself
-symbol('(builtin)').nud = itself
-symbol('(literal)').nud = itself
-symbol('(end)')
-
-symbol(':')
-symbol(';')
-symbol(',')
-symbol(')')
-symbol(']')
-symbol('}')
-
-infixr('&&', 30)
-infixr('||', 30)
-infix('|', 43)
-infix('^', 44)
-infix('&', 45)
-infix('==', 46)
-infix('!=', 46)
-infix('<', 47)
-infix('<=', 47)
-infix('>', 47)
-infix('>=', 47)
-infix('>>', 48)
-infix('<<', 48)
-infix('+', 50)
-infix('-', 50)
-infix('*', 60)
-infix('/', 60)
-infix('%', 60)
-infix('?', 20, function(left) {
-  this.children = [left, expression(0), (advance(':'), expression(0))]
-  this.type = 'ternary'
-  return this
-})
-infix('.', 80, function(left) {
-  token.type = 'literal'
-  state.fake(token)
-  this.children = [left, token]
-  advance()
-  return this
-})
-infix('[', 80, function(left) {
-  this.children = [left, expression(0)]
-  this.type = 'binary'
-  advance(']')
-  return this
-})
-infix('(', 80, function(left) {
-  this.children = [left]
-  this.type = 'call'
-
-  if(token.data !== ')') while(1) {
-    this.children.push(expression(0))
-    if(token.data !== ',') break
-    advance(',')
-  }
-  advance(')')
-  return this
-})
-
-prefix('-')
-prefix('+')
-prefix('!')
-prefix('~')
-prefix('defined')
-prefix('(', function() {
-  this.type = 'group'
-  this.children = [expression(0)]
-  advance(')')
-  return this 
-})
-prefix('++')
-prefix('--')
-suffix('++')
-suffix('--')
-
-assignment('=')
-assignment('+=')
-assignment('-=')
-assignment('*=')
-assignment('/=')
-assignment('%=')
-assignment('&=')
-assignment('|=')
-assignment('^=')
-assignment('>>=')
-assignment('<<=')
-
-module.exports = function(incoming_state, incoming_tokens) {
-  state = incoming_state
-  tokens = incoming_tokens
-  idx = 0
-  var result
-
-  if(!tokens.length) return
-
-  advance()
-  result = expression(0)
-  result.parent = state[0]
-  emit(result)
-
-  if(idx < tokens.length) {
-    throw new Error('did not use all tokens')
-  }
-
-  result.parent.children = [result]
-
-  function emit(node) {
-    state.unshift(node, false)
-    for(var i = 0, len = node.children.length; i < len; ++i) {
-      emit(node.children[i])
-    }
-    state.shift()
-  }
-
-}
-
-function symbol(id, binding_power) {
-  var sym = symbol_table[id]
-  binding_power = binding_power || 0
-  if(sym) {
-    if(binding_power > sym.lbp) {
-      sym.lbp = binding_power
-    }
-  } else {
-    sym = Object.create(original_symbol)
-    sym.id = id 
-    sym.lbp = binding_power
-    symbol_table[id] = sym
-  }
-  return sym
-}
-
-function expression(rbp) {
-  var left, t = token
-  advance()
-
-  left = t.nud()
-  while(rbp < token.lbp) {
-    t = token
-    advance()
-    left = t.led(left)
-  }
-  return left
-}
-
-function infix(id, bp, led) {
-  var sym = symbol(id, bp)
-  sym.led = led || function(left) {
-    this.children = [left, expression(bp)]
-    this.type = 'binary'
-    return this
-  }
-}
-
-function infixr(id, bp, led) {
-  var sym = symbol(id, bp)
-  sym.led = led || function(left) {
-    this.children = [left, expression(bp - 1)]
-    this.type = 'binary'
-    return this
-  }
-  return sym
-}
-
-function prefix(id, nud) {
-  var sym = symbol(id)
-  sym.nud = nud || function() {
-    this.children = [expression(70)]
-    this.type = 'unary'
-    return this
-  }
-  return sym
-}
-
-function suffix(id) {
-  var sym = symbol(id, 150)
-  sym.led = function(left) {
-    this.children = [left]
-    this.type = 'suffix'
-    return this
-  }
-}
-
-function assignment(id) {
-  return infixr(id, 10, function(left) {
-    this.children = [left, expression(9)]
-    this.assignment = true
-    this.type = 'assign'
-    return this
-  })
-}
-
-function advance(id) {
-  var next
-    , value
-    , type
-    , output
-
-  if(id && token.data !== id) {
-    return state.unexpected('expected `'+ id + '`, got `'+token.data+'`')
-  }
-
-  if(idx >= tokens.length) {
-    token = symbol_table['(end)']
-    return
-  }
-
-  next = tokens[idx++]
-  value = next.data
-  type = next.type
-
-  if(type === 'ident') {
-    output = state.scope.find(value) || state.create_node()
-    type = output.type
-  } else if(type === 'builtin') {
-    output = symbol_table['(builtin)']
-  } else if(type === 'keyword') {
-    output = symbol_table['(keyword)']
-  } else if(type === 'operator') {
-    output = symbol_table[value]
-    if(!output) {
-      return state.unexpected('unknown operator `'+value+'`')
-    }
-  } else if(type === 'float' || type === 'integer') {
-    type = 'literal'
-    output = symbol_table['(literal)']
-  } else {
-    return state.unexpected('unexpected token.')
-  }
-
-  if(output) {
-    if(!output.nud) { output.nud = itself }
-    if(!output.children) { output.children = [] }
-  }
-
-  output = Object.create(output)
-  output.token = next
-  output.type = type
-  if(!output.data) output.data = value
-
-  return token = output
-}
-
-function fail(message) {
-  return function() { return state.unexpected(message) }
-}
-
-},{}],72:[function(require,module,exports){
+},{"./lib/literals":82,"./lib/operators":83,"./lib/builtins":84,"through":67}],72:[function(require,module,exports){
 "use strict"
 
 var uniq = require("uniq")
@@ -21524,7 +21219,314 @@ function generateCWiseOp(proc, typesig) {
   return f()
 }
 module.exports = generateCWiseOp
-},{"uniq":87}],87:[function(require,module,exports){
+},{"uniq":85}],86:[function(require,module,exports){
+var state
+  , token
+  , tokens
+  , idx
+
+var original_symbol = {
+    nud: function() { return this.children && this.children.length ? this : fail('unexpected')() }
+  , led: fail('missing operator')
+}
+
+var symbol_table = {}
+
+function itself() {
+  return this
+}
+
+symbol('(ident)').nud = itself
+symbol('(keyword)').nud = itself
+symbol('(builtin)').nud = itself
+symbol('(literal)').nud = itself
+symbol('(end)')
+
+symbol(':')
+symbol(';')
+symbol(',')
+symbol(')')
+symbol(']')
+symbol('}')
+
+infixr('&&', 30)
+infixr('||', 30)
+infix('|', 43)
+infix('^', 44)
+infix('&', 45)
+infix('==', 46)
+infix('!=', 46)
+infix('<', 47)
+infix('<=', 47)
+infix('>', 47)
+infix('>=', 47)
+infix('>>', 48)
+infix('<<', 48)
+infix('+', 50)
+infix('-', 50)
+infix('*', 60)
+infix('/', 60)
+infix('%', 60)
+infix('?', 20, function(left) {
+  this.children = [left, expression(0), (advance(':'), expression(0))]
+  this.type = 'ternary'
+  return this
+})
+infix('.', 80, function(left) {
+  token.type = 'literal'
+  state.fake(token)
+  this.children = [left, token]
+  advance()
+  return this
+})
+infix('[', 80, function(left) {
+  this.children = [left, expression(0)]
+  this.type = 'binary'
+  advance(']')
+  return this
+})
+infix('(', 80, function(left) {
+  this.children = [left]
+  this.type = 'call'
+
+  if(token.data !== ')') while(1) {
+    this.children.push(expression(0))
+    if(token.data !== ',') break
+    advance(',')
+  }
+  advance(')')
+  return this
+})
+
+prefix('-')
+prefix('+')
+prefix('!')
+prefix('~')
+prefix('defined')
+prefix('(', function() {
+  this.type = 'group'
+  this.children = [expression(0)]
+  advance(')')
+  return this 
+})
+prefix('++')
+prefix('--')
+suffix('++')
+suffix('--')
+
+assignment('=')
+assignment('+=')
+assignment('-=')
+assignment('*=')
+assignment('/=')
+assignment('%=')
+assignment('&=')
+assignment('|=')
+assignment('^=')
+assignment('>>=')
+assignment('<<=')
+
+module.exports = function(incoming_state, incoming_tokens) {
+  state = incoming_state
+  tokens = incoming_tokens
+  idx = 0
+  var result
+
+  if(!tokens.length) return
+
+  advance()
+  result = expression(0)
+  result.parent = state[0]
+  emit(result)
+
+  if(idx < tokens.length) {
+    throw new Error('did not use all tokens')
+  }
+
+  result.parent.children = [result]
+
+  function emit(node) {
+    state.unshift(node, false)
+    for(var i = 0, len = node.children.length; i < len; ++i) {
+      emit(node.children[i])
+    }
+    state.shift()
+  }
+
+}
+
+function symbol(id, binding_power) {
+  var sym = symbol_table[id]
+  binding_power = binding_power || 0
+  if(sym) {
+    if(binding_power > sym.lbp) {
+      sym.lbp = binding_power
+    }
+  } else {
+    sym = Object.create(original_symbol)
+    sym.id = id 
+    sym.lbp = binding_power
+    symbol_table[id] = sym
+  }
+  return sym
+}
+
+function expression(rbp) {
+  var left, t = token
+  advance()
+
+  left = t.nud()
+  while(rbp < token.lbp) {
+    t = token
+    advance()
+    left = t.led(left)
+  }
+  return left
+}
+
+function infix(id, bp, led) {
+  var sym = symbol(id, bp)
+  sym.led = led || function(left) {
+    this.children = [left, expression(bp)]
+    this.type = 'binary'
+    return this
+  }
+}
+
+function infixr(id, bp, led) {
+  var sym = symbol(id, bp)
+  sym.led = led || function(left) {
+    this.children = [left, expression(bp - 1)]
+    this.type = 'binary'
+    return this
+  }
+  return sym
+}
+
+function prefix(id, nud) {
+  var sym = symbol(id)
+  sym.nud = nud || function() {
+    this.children = [expression(70)]
+    this.type = 'unary'
+    return this
+  }
+  return sym
+}
+
+function suffix(id) {
+  var sym = symbol(id, 150)
+  sym.led = function(left) {
+    this.children = [left]
+    this.type = 'suffix'
+    return this
+  }
+}
+
+function assignment(id) {
+  return infixr(id, 10, function(left) {
+    this.children = [left, expression(9)]
+    this.assignment = true
+    this.type = 'assign'
+    return this
+  })
+}
+
+function advance(id) {
+  var next
+    , value
+    , type
+    , output
+
+  if(id && token.data !== id) {
+    return state.unexpected('expected `'+ id + '`, got `'+token.data+'`')
+  }
+
+  if(idx >= tokens.length) {
+    token = symbol_table['(end)']
+    return
+  }
+
+  next = tokens[idx++]
+  value = next.data
+  type = next.type
+
+  if(type === 'ident') {
+    output = state.scope.find(value) || state.create_node()
+    type = output.type
+  } else if(type === 'builtin') {
+    output = symbol_table['(builtin)']
+  } else if(type === 'keyword') {
+    output = symbol_table['(keyword)']
+  } else if(type === 'operator') {
+    output = symbol_table[value]
+    if(!output) {
+      return state.unexpected('unknown operator `'+value+'`')
+    }
+  } else if(type === 'float' || type === 'integer') {
+    type = 'literal'
+    output = symbol_table['(literal)']
+  } else {
+    return state.unexpected('unexpected token.')
+  }
+
+  if(output) {
+    if(!output.nud) { output.nud = itself }
+    if(!output.children) { output.children = [] }
+  }
+
+  output = Object.create(output)
+  output.token = next
+  output.type = type
+  if(!output.data) output.data = value
+
+  return token = output
+}
+
+function fail(message) {
+  return function() { return state.unexpected(message) }
+}
+
+},{}],87:[function(require,module,exports){
+module.exports = scope
+
+function scope(state) {
+  if(this.constructor !== scope)
+    return new scope(state)
+
+  this.state = state
+  this.scopes = []
+  this.current = null
+}
+
+var cons = scope
+  , proto = cons.prototype
+
+proto.enter = function(s) {
+  this.scopes.push(
+    this.current = this.state[0].scope = s || {}
+  )
+}
+
+proto.exit = function() {
+  this.scopes.pop()
+  this.current = this.scopes[this.scopes.length - 1]
+}
+
+proto.define = function(str) {
+  this.current[str] = this.state[0]
+}
+
+proto.find = function(name, fail) {
+  for(var i = this.scopes.length - 1; i > -1; --i) {
+    if(this.scopes[i].hasOwnProperty(name)) {
+      return this.scopes[i][name]
+    }
+  }
+
+  return null
+}
+
+},{}],85:[function(require,module,exports){
 "use strict"
 
 function unique_pred(list, compare) {
@@ -22542,7 +22544,63 @@ function is_precision(token) {
          token.data === 'lowp'
 }
 
-},{"./scope":85,"./expr":86,"through":88}],88:[function(require,module,exports){
+},{"./expr":86,"./scope":87,"through":88}],79:[function(require,module,exports){
+"use strict";
+
+var numeric = require("numeric");
+var EPSILON = 1e-6;
+
+//General purpose algorithm, uses quadratic programming, very slow
+function closestPointnd(c, positions, x, result) {
+  var D = numeric.rep([c.length, c.length], 0.0);
+  var dvec = numeric.rep([c.length], 0.0);
+  for(var i=0; i<c.length; ++i) {
+    var pi = positions[c[i]];
+    dvec[i] = numeric.dot(pi, x);
+    for(var j=0; j<c.length; ++j) {
+      var pj = positions[c[j]];
+      D[i][j] = D[j][i] = numeric.dot(pi, pj);
+    }
+  }
+  var A = numeric.rep([c.length, c.length+2], 0.0);
+  var b = numeric.rep([c.length+2], 0.0);
+  b[0] = 1.0-EPSILON;
+  b[1] = -(1.0+EPSILON);
+  for(var i=0; i<c.length; ++i) {
+    A[i][0]   = 1;
+    A[i][1]   = -1
+    A[i][i+2] = 1;
+  }
+  for(var attempts=0; attempts<15; ++attempts) {
+    var fortran_poop = numeric.solveQP(D, dvec, A, b);
+    if(fortran_poop.message.length > 0) {
+      //Quadratic form may be singular, perturb and resolve
+      for(var i=0; i<c.length; ++i) {
+        D[i][i] += 1e-8;
+      }
+      continue;
+    } else if(isNaN(fortran_poop.value[0])) {
+      break;
+    } else {
+      //Success!
+      var solution = fortran_poop.solution;
+      for(var i=0; i<x.length; ++i) {
+        result[i] = 0.0;
+        for(var j=0; j<solution.length; ++j) {
+          result[i] += solution[j] * positions[c[j]][i];
+        }
+      }
+      return 2.0 * fortran_poop.value[0] + numeric.dot(x,x);
+    }
+  }
+  for(var i=0; i<x.length; ++i) {
+    result[i] = Number.NaN;
+  }
+  return Number.NaN;
+}
+
+module.exports = closestPointnd;
+},{"numeric":68}],88:[function(require,module,exports){
 (function(process){var Stream = require('stream')
 
 // through
@@ -22643,61 +22701,5 @@ function through (write, end) {
 
 
 })(require("__browserify_process"))
-},{"stream":75,"__browserify_process":23}],79:[function(require,module,exports){
-"use strict";
-
-var numeric = require("numeric");
-var EPSILON = 1e-6;
-
-//General purpose algorithm, uses quadratic programming, very slow
-function closestPointnd(c, positions, x, result) {
-  var D = numeric.rep([c.length, c.length], 0.0);
-  var dvec = numeric.rep([c.length], 0.0);
-  for(var i=0; i<c.length; ++i) {
-    var pi = positions[c[i]];
-    dvec[i] = numeric.dot(pi, x);
-    for(var j=0; j<c.length; ++j) {
-      var pj = positions[c[j]];
-      D[i][j] = D[j][i] = numeric.dot(pi, pj);
-    }
-  }
-  var A = numeric.rep([c.length, c.length+2], 0.0);
-  var b = numeric.rep([c.length+2], 0.0);
-  b[0] = 1.0-EPSILON;
-  b[1] = -(1.0+EPSILON);
-  for(var i=0; i<c.length; ++i) {
-    A[i][0]   = 1;
-    A[i][1]   = -1
-    A[i][i+2] = 1;
-  }
-  for(var attempts=0; attempts<15; ++attempts) {
-    var fortran_poop = numeric.solveQP(D, dvec, A, b);
-    if(fortran_poop.message.length > 0) {
-      //Quadratic form may be singular, perturb and resolve
-      for(var i=0; i<c.length; ++i) {
-        D[i][i] += 1e-8;
-      }
-      continue;
-    } else if(isNaN(fortran_poop.value[0])) {
-      break;
-    } else {
-      //Success!
-      var solution = fortran_poop.solution;
-      for(var i=0; i<x.length; ++i) {
-        result[i] = 0.0;
-        for(var j=0; j<solution.length; ++j) {
-          result[i] += solution[j] * positions[c[j]][i];
-        }
-      }
-      return 2.0 * fortran_poop.value[0] + numeric.dot(x,x);
-    }
-  }
-  for(var i=0; i<x.length; ++i) {
-    result[i] = Number.NaN;
-  }
-  return Number.NaN;
-}
-
-module.exports = closestPointnd;
-},{"numeric":68}]},{},[1])
+},{"stream":75,"__browserify_process":23}]},{},[1])
 ;
