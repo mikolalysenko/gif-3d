@@ -15,7 +15,7 @@
     "gl-texture2d": "~0.1.4",
     "brfs": "~0.0.8",
     "gl-vao": "~0.0.3",
-    "bit-twiddle": "0.0.2"
+    "bit-twiddle": "~0.0.2"
   },
   "devDependencies": {
     "beefy": "~0.4.4",
