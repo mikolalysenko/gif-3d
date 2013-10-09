@@ -10,6 +10,8 @@ Install
 Example
 =======
 
+[View this demo in your browser right now](http://mikolalysenko.github.io/raymarch/)
+
 ```javascript
 var createVolumeRenderer = require("raymarch")
 var shell = require("gl-now")()
