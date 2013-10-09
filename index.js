@@ -144,6 +144,8 @@ function createVolumeRenderer(gl, array) {
 	var s1 = ndarray(data, [gridH, gridW])
 	var texture = createTexture(gl, s1)
 	pool.free(data)
+	texture.minFilter = gl.LINEAR
+	texture.magFilter = gl.LINEAR
 	
 	//Create buffers for cube
 	var cubeVerts = []
