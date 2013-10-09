@@ -14,13 +14,16 @@
     "typedarray-pool": "~0.1.1",
     "gl-texture2d": "~0.1.4",
     "brfs": "~0.0.8",
-    "gl-vao": "~0.0.3"
+    "gl-vao": "~0.0.3",
+    "bit-twiddle": "0.0.2"
   },
   "devDependencies": {
     "beefy": "~0.4.4",
     "game-shell-orbit-camera": "~0.0.0",
     "gl-matrix": "~2.0.0",
-    "gl-now": "~0.0.4"
+    "gl-now": "~0.0.4",
+    "bunny": "~1.0.0",
+    "voxelize": "~0.1.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
