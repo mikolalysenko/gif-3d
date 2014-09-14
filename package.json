@@ -20,11 +20,13 @@
     "glslify": "^1.6.0",
     "game-shell-orbit-camera": "^1.0.0",
     "get-pixels": "^1.1.3",
-    "ndarray-ops": "^1.2.2"
+    "ndarray-ops": "^1.2.2",
+    "right-now": "^1.0.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "beefy index.js --open"
+    "start": "beefy index.js:bundle.js --open",
+    "build": "browserify index.js -o bundle.js"
   },
   "repository": {
     "type": "git",
