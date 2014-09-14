@@ -7,7 +7,7 @@ var mat4        = require('gl-mat4')
 var now         = require('right-now')
 var createVolumeRenderer = require('./lib/viewer.js')
 
-camera.lookAt([3,0,0], [0,0,0], [0,1,0])
+camera.lookAt([0,0,-5], [0,0,0], [0,-1,0])
 
 var viewer
 
