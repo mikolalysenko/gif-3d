@@ -12,7 +12,7 @@ camera.lookAt([0,0,-5], [0,0,0], [0,-1,0])
 var viewer
 
 shell.on("gl-init", function() {
-  getPixels("/example/banana.gif", function(err, voxels) {
+  getPixels("example/banana.gif", function(err, voxels) {
     viewer = createVolumeRenderer(shell.gl, voxels)
   })
 })
