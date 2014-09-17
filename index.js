@@ -5,16 +5,31 @@ var camera      = require('game-shell-orbit-camera')(shell)
 var getPixels   = require('get-pixels')
 var mat4        = require('gl-mat4')
 var now         = require('right-now')
+var url         = require('parsed-url')
 var createVolumeRenderer = require('./lib/viewer.js')
 
 camera.lookAt([0,0,-5], [0,0,0], [0,-1,0])
 
 var viewer
 
+
+function loadVoxels(href) {
+  getPixels(href, onVoxels)
+}
+
+function onVoxels(err, voxels) {
+  if(err || voxels.dimension !== 4) {
+    loadVoxels("example/banana.gif")
+    return
+  }
+  if(viewer) {
+    viewer.dispose()
+  }
+  viewer = createVolumeRenderer(shell.gl, voxels)
+}
+
 shell.on("gl-init", function() {
-  getPixels("example/banana.gif", function(err, voxels) {
-    viewer = createVolumeRenderer(shell.gl, voxels)
-  })
+  loadVoxels(url.query.href || "example/banana.gif")
 })
 
 shell.on("gl-render", function() {

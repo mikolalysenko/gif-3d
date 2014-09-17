@@ -19,35 +19,48 @@ vec2 zcoords(float iz) {
 
 vec4 getVoxel(vec3 p) {  
   //Calculate clamp weight
-  vec3 wp = step(-1.0, p) * step(-1.0, -p);
-  float w = wp.x * wp.y * wp.z;
-
-  //Texture coords run from [-1,1], so rescale to voxel units
-  vec3 sp = 0.5 * (p + 1.0);
-  sp.z = fract(sp.z + timeShift);
-  sp *= (shape-1.0);
+  vec2 wp = step(0.0, p.xy) * step(-shape.xy, -p.xy);
+  float w = wp.x * wp.y * 
+    step(shape.z*timeShift, p.z) *
+    step(-shape.z*(1.0+timeShift), -p.z);
 
   //Get offset in xy slice
-  vec2 coord = sp.xy;
+  vec2 coord = p.xy;
 
   //Get z-coordinate
-  float iz = floor(sp.z);
-  float fz = fract(sp.z);
+  float iz = floor(shape.z*fract(p.z/shape.z));
 
   //Read pixels
-  vec4 l0 = texture2D(voxels, (coord + zcoords(iz))     / tshape);
-  vec4 l1 = texture2D(voxels, (coord + zcoords(iz+1.0)) / tshape);
+  return w * texture2D(voxels, (coord + zcoords(iz)) / tshape);
+}
 
-  //Read out result
-  return mix(l0, l1, fz) * w;
+float rayStep(vec3 coordinate, vec3 direction) {
+  vec3 f = fract(coordinate);
+  vec3 dt_pos = (1.0-f) / direction;
+  vec3 dt_neg = -f / direction;
+  vec3 dt = mix(dt_neg, dt_pos, step(0.0, direction));
+  return max(min(min(dt.x, dt.y), dt.z), 0.001);
+}
+
+vec4 over(vec4 ca, vec4 cb) {
+  float ao = 1.0 - (1.0 - ca.a) * (1.0 - cb.a);
+  return vec4(step(0.0, ao) * mix(cb.rgb, ca.rgb, ca.a / ao), ao);
+}
+
+float alphaWeight(float ao, float dt) {
+  return 1.0 - exp(-4.0 * ao * opacity * dt);
 }
 
 vec4 castRay(vec3 origin, vec3 direction) {
-  float dt = 0.045;
   vec4 c = vec4(0.0,0.0,0.0,0.0);
   for(int i=0; i<100; ++i) {
-    vec4 ci = getVoxel(origin) * opacity;
-    c = c + ci *  max(1.0 - c.a, 0.0);
+    //Calculate step
+    float dt = rayStep(origin, direction);
+    
+    //Update color
+    vec4 ci = getVoxel(origin);
+    c = over(c, vec4(ci.rgb, alphaWeight(ci.a, dt)));
+
     origin += direction * dt;
   }
   return c;
@@ -55,8 +68,11 @@ vec4 castRay(vec3 origin, vec3 direction) {
 
 void main() {
   vec3 eye = clipToWorld[3].xyz / clipToWorld[3].w;
-  vec3 rayDirection = normalize(rayOrigin - eye);
-  
-  vec4 hitColor = castRay(rayOrigin, rayDirection);
+
+  vec3 direction = normalize(shape*(rayOrigin - eye));
+  vec3 origin    = shape * (0.5 * (rayOrigin + 1.0));
+  origin.z      += timeShift * shape.z;
+
+  vec4 hitColor = castRay(origin, direction);
   gl_FragColor = vec4(hitColor.rgb / max(hitColor.a,0.001), hitColor.a);
 }
