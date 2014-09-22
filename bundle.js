@@ -10,6 +10,8 @@ var url         = require('parsed-url')
 var listenDrop  = require('drag-and-drop-files')
 var createVolumeRenderer = require('./lib/viewer.js')
 
+var gifInput = document.querySelector("#gifurl")
+
 camera.lookAt([0,0,-5], [0,0,0], [0,-1,0])
 
 var viewer
@@ -41,6 +43,10 @@ shell.on("gl-init", function() {
     }
     reader.readAsDataURL(files[0])
   })
+
+  gifInput.onchange = function() {
+    loadVoxels(gifInput.value + '')
+  }
 })
 
 shell.on("gl-render", function() {
@@ -52,7 +58,7 @@ shell.on("gl-render", function() {
   }
 })
 
-},{"./lib/viewer.js":2,"gl-now":3,"game-shell-orbit-camera":4,"get-pixels":5,"gl-mat4":6,"right-now":7,"parsed-url":8,"drag-and-drop-files":9}],7:[function(require,module,exports){
+},{"./lib/viewer.js":2,"game-shell-orbit-camera":3,"get-pixels":4,"gl-now":5,"right-now":6,"gl-mat4":7,"parsed-url":8,"drag-and-drop-files":9}],6:[function(require,module,exports){
 (function(global){module.exports =
   global.performance &&
   global.performance.now ? function now() {
@@ -86,7 +92,7 @@ function addDragDropListener(element, callback) {
 module.exports = addDragDropListener
 },{}],8:[function(require,module,exports){
 module.exports=require("url").parse(window.location.href, true)
-},{"url":10}],6:[function(require,module,exports){
+},{"url":10}],7:[function(require,module,exports){
 module.exports = {
   create: require('./create')
   , clone: require('./clone')
@@ -111,63 +117,239 @@ module.exports = {
   , lookAt: require('./lookAt')
   , str: require('./str')
 }
-},{"./create":11,"./clone":12,"./copy":13,"./identity":14,"./transpose":15,"./invert":16,"./adjoint":17,"./determinant":18,"./multiply":19,"./translate":20,"./scale":21,"./rotate":22,"./rotateX":23,"./rotateY":24,"./rotateZ":25,"./fromRotationTranslation":26,"./fromQuat":27,"./frustum":28,"./perspective":29,"./ortho":30,"./lookAt":31,"./str":32}],11:[function(require,module,exports){
-module.exports = create;
+},{"./create":11,"./clone":12,"./copy":13,"./identity":14,"./transpose":15,"./invert":16,"./adjoint":17,"./determinant":18,"./multiply":19,"./translate":20,"./scale":21,"./rotate":22,"./rotateX":23,"./rotateY":24,"./rotateZ":25,"./fromRotationTranslation":26,"./fromQuat":27,"./frustum":28,"./perspective":29,"./ortho":30,"./lookAt":31,"./str":32}],33:[function(require,module,exports){
+// shim for using process in browser
 
-/**
- * Creates a new identity mat4
- *
- * @returns {mat4} a new 4x4 matrix
- */
-function create() {
-    var out = new Float32Array(16);
-    out[0] = 1;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 0;
-    out[5] = 1;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = 0;
-    out[9] = 0;
-    out[10] = 1;
-    out[11] = 0;
-    out[12] = 0;
-    out[13] = 0;
-    out[14] = 0;
-    out[15] = 1;
-    return out;
-};
-},{}],14:[function(require,module,exports){
-module.exports = identity;
+var process = module.exports = {};
 
-/**
- * Set a mat4 to the identity matrix
- *
- * @param {mat4} out the receiving matrix
- * @returns {mat4} out
- */
-function identity(out) {
-    out[0] = 1;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 0;
-    out[5] = 1;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = 0;
-    out[9] = 0;
-    out[10] = 1;
-    out[11] = 0;
-    out[12] = 0;
-    out[13] = 0;
-    out[14] = 0;
-    out[15] = 1;
-    return out;
+process.nextTick = (function () {
+    var canSetImmediate = typeof window !== 'undefined'
+    && window.setImmediate;
+    var canPost = typeof window !== 'undefined'
+    && window.postMessage && window.addEventListener
+    ;
+
+    if (canSetImmediate) {
+        return function (f) { return window.setImmediate(f) };
+    }
+
+    if (canPost) {
+        var queue = [];
+        window.addEventListener('message', function (ev) {
+            if (ev.source === window && ev.data === 'process-tick') {
+                ev.stopPropagation();
+                if (queue.length > 0) {
+                    var fn = queue.shift();
+                    fn();
+                }
+            }
+        }, true);
+
+        return function nextTick(fn) {
+            queue.push(fn);
+            window.postMessage('process-tick', '*');
+        };
+    }
+
+    return function nextTick(fn) {
+        setTimeout(fn, 0);
+    };
+})();
+
+process.title = 'browser';
+process.browser = true;
+process.env = {};
+process.argv = [];
+
+process.binding = function (name) {
+    throw new Error('process.binding is not supported');
+}
+
+// TODO(shtylman)
+process.cwd = function () { return '/' };
+process.chdir = function (dir) {
+    throw new Error('process.chdir is not supported');
 };
-},{}],13:[function(require,module,exports){
+
+},{}],34:[function(require,module,exports){
+(function(process){function filter (xs, fn) {
+    var res = [];
+    for (var i = 0; i < xs.length; i++) {
+        if (fn(xs[i], i, xs)) res.push(xs[i]);
+    }
+    return res;
+}
+
+// resolves . and .. elements in a path array with directory names there
+// must be no slashes, empty elements, or device names (c:\) in the array
+// (so also no leading and trailing slashes - it does not distinguish
+// relative and absolute paths)
+function normalizeArray(parts, allowAboveRoot) {
+  // if the path tries to go above the root, `up` ends up > 0
+  var up = 0;
+  for (var i = parts.length; i >= 0; i--) {
+    var last = parts[i];
+    if (last == '.') {
+      parts.splice(i, 1);
+    } else if (last === '..') {
+      parts.splice(i, 1);
+      up++;
+    } else if (up) {
+      parts.splice(i, 1);
+      up--;
+    }
+  }
+
+  // if the path is allowed to go above the root, restore leading ..s
+  if (allowAboveRoot) {
+    for (; up--; up) {
+      parts.unshift('..');
+    }
+  }
+
+  return parts;
+}
+
+// Regex to split a filename into [*, dir, basename, ext]
+// posix version
+var splitPathRe = /^(.+\/(?!$)|\/)?((?:.+?)?(\.[^.]*)?)$/;
+
+// path.resolve([from ...], to)
+// posix version
+exports.resolve = function() {
+var resolvedPath = '',
+    resolvedAbsolute = false;
+
+for (var i = arguments.length; i >= -1 && !resolvedAbsolute; i--) {
+  var path = (i >= 0)
+      ? arguments[i]
+      : process.cwd();
+
+  // Skip empty and invalid entries
+  if (typeof path !== 'string' || !path) {
+    continue;
+  }
+
+  resolvedPath = path + '/' + resolvedPath;
+  resolvedAbsolute = path.charAt(0) === '/';
+}
+
+// At this point the path should be resolved to a full absolute path, but
+// handle relative paths to be safe (might happen when process.cwd() fails)
+
+// Normalize the path
+resolvedPath = normalizeArray(filter(resolvedPath.split('/'), function(p) {
+    return !!p;
+  }), !resolvedAbsolute).join('/');
+
+  return ((resolvedAbsolute ? '/' : '') + resolvedPath) || '.';
+};
+
+// path.normalize(path)
+// posix version
+exports.normalize = function(path) {
+var isAbsolute = path.charAt(0) === '/',
+    trailingSlash = path.slice(-1) === '/';
+
+// Normalize the path
+path = normalizeArray(filter(path.split('/'), function(p) {
+    return !!p;
+  }), !isAbsolute).join('/');
+
+  if (!path && !isAbsolute) {
+    path = '.';
+  }
+  if (path && trailingSlash) {
+    path += '/';
+  }
+  
+  return (isAbsolute ? '/' : '') + path;
+};
+
+
+// posix version
+exports.join = function() {
+  var paths = Array.prototype.slice.call(arguments, 0);
+  return exports.normalize(filter(paths, function(p, index) {
+    return p && typeof p === 'string';
+  }).join('/'));
+};
+
+
+exports.dirname = function(path) {
+  var dir = splitPathRe.exec(path)[1] || '';
+  var isWindows = false;
+  if (!dir) {
+    // No dirname
+    return '.';
+  } else if (dir.length === 1 ||
+      (isWindows && dir.length <= 3 && dir.charAt(1) === ':')) {
+    // It is just a slash or a drive letter with a slash
+    return dir;
+  } else {
+    // It is a full dirname, strip trailing slash
+    return dir.substring(0, dir.length - 1);
+  }
+};
+
+
+exports.basename = function(path, ext) {
+  var f = splitPathRe.exec(path)[2] || '';
+  // TODO: make this comparison case-insensitive on windows?
+  if (ext && f.substr(-1 * ext.length) === ext) {
+    f = f.substr(0, f.length - ext.length);
+  }
+  return f;
+};
+
+
+exports.extname = function(path) {
+  return splitPathRe.exec(path)[3] || '';
+};
+
+exports.relative = function(from, to) {
+  from = exports.resolve(from).substr(1);
+  to = exports.resolve(to).substr(1);
+
+  function trim(arr) {
+    var start = 0;
+    for (; start < arr.length; start++) {
+      if (arr[start] !== '') break;
+    }
+
+    var end = arr.length - 1;
+    for (; end >= 0; end--) {
+      if (arr[end] !== '') break;
+    }
+
+    if (start > end) return [];
+    return arr.slice(start, end - start + 1);
+  }
+
+  var fromParts = trim(from.split('/'));
+  var toParts = trim(to.split('/'));
+
+  var length = Math.min(fromParts.length, toParts.length);
+  var samePartsLength = length;
+  for (var i = 0; i < length; i++) {
+    if (fromParts[i] !== toParts[i]) {
+      samePartsLength = i;
+      break;
+    }
+  }
+
+  var outputParts = [];
+  for (var i = samePartsLength; i < fromParts.length; i++) {
+    outputParts.push('..');
+  }
+
+  outputParts = outputParts.concat(toParts.slice(samePartsLength));
+
+  return outputParts.join('/');
+};
+
+})(require("__browserify_process"))
+},{"__browserify_process":33}],13:[function(require,module,exports){
 module.exports = copy;
 
 /**
@@ -225,6 +407,62 @@ function clone(a) {
     out[15] = a[15];
     return out;
 };
+},{}],11:[function(require,module,exports){
+module.exports = create;
+
+/**
+ * Creates a new identity mat4
+ *
+ * @returns {mat4} a new 4x4 matrix
+ */
+function create() {
+    var out = new Float32Array(16);
+    out[0] = 1;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = 0;
+    out[5] = 1;
+    out[6] = 0;
+    out[7] = 0;
+    out[8] = 0;
+    out[9] = 0;
+    out[10] = 1;
+    out[11] = 0;
+    out[12] = 0;
+    out[13] = 0;
+    out[14] = 0;
+    out[15] = 1;
+    return out;
+};
+},{}],14:[function(require,module,exports){
+module.exports = identity;
+
+/**
+ * Set a mat4 to the identity matrix
+ *
+ * @param {mat4} out the receiving matrix
+ * @returns {mat4} out
+ */
+function identity(out) {
+    out[0] = 1;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = 0;
+    out[5] = 1;
+    out[6] = 0;
+    out[7] = 0;
+    out[8] = 0;
+    out[9] = 0;
+    out[10] = 1;
+    out[11] = 0;
+    out[12] = 0;
+    out[13] = 0;
+    out[14] = 0;
+    out[15] = 1;
+    return out;
+};
 },{}],15:[function(require,module,exports){
 module.exports = transpose;
 
@@ -273,6 +511,40 @@ function transpose(out, a) {
         out[15] = a[15];
     }
     
+    return out;
+};
+},{}],17:[function(require,module,exports){
+module.exports = adjoint;
+
+/**
+ * Calculates the adjugate of a mat4
+ *
+ * @param {mat4} out the receiving matrix
+ * @param {mat4} a the source matrix
+ * @returns {mat4} out
+ */
+function adjoint(out, a) {
+    var a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
+        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
+        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
+        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
+
+    out[0]  =  (a11 * (a22 * a33 - a23 * a32) - a21 * (a12 * a33 - a13 * a32) + a31 * (a12 * a23 - a13 * a22));
+    out[1]  = -(a01 * (a22 * a33 - a23 * a32) - a21 * (a02 * a33 - a03 * a32) + a31 * (a02 * a23 - a03 * a22));
+    out[2]  =  (a01 * (a12 * a33 - a13 * a32) - a11 * (a02 * a33 - a03 * a32) + a31 * (a02 * a13 - a03 * a12));
+    out[3]  = -(a01 * (a12 * a23 - a13 * a22) - a11 * (a02 * a23 - a03 * a22) + a21 * (a02 * a13 - a03 * a12));
+    out[4]  = -(a10 * (a22 * a33 - a23 * a32) - a20 * (a12 * a33 - a13 * a32) + a30 * (a12 * a23 - a13 * a22));
+    out[5]  =  (a00 * (a22 * a33 - a23 * a32) - a20 * (a02 * a33 - a03 * a32) + a30 * (a02 * a23 - a03 * a22));
+    out[6]  = -(a00 * (a12 * a33 - a13 * a32) - a10 * (a02 * a33 - a03 * a32) + a30 * (a02 * a13 - a03 * a12));
+    out[7]  =  (a00 * (a12 * a23 - a13 * a22) - a10 * (a02 * a23 - a03 * a22) + a20 * (a02 * a13 - a03 * a12));
+    out[8]  =  (a10 * (a21 * a33 - a23 * a31) - a20 * (a11 * a33 - a13 * a31) + a30 * (a11 * a23 - a13 * a21));
+    out[9]  = -(a00 * (a21 * a33 - a23 * a31) - a20 * (a01 * a33 - a03 * a31) + a30 * (a01 * a23 - a03 * a21));
+    out[10] =  (a00 * (a11 * a33 - a13 * a31) - a10 * (a01 * a33 - a03 * a31) + a30 * (a01 * a13 - a03 * a11));
+    out[11] = -(a00 * (a11 * a23 - a13 * a21) - a10 * (a01 * a23 - a03 * a21) + a20 * (a01 * a13 - a03 * a11));
+    out[12] = -(a10 * (a21 * a32 - a22 * a31) - a20 * (a11 * a32 - a12 * a31) + a30 * (a11 * a22 - a12 * a21));
+    out[13] =  (a00 * (a21 * a32 - a22 * a31) - a20 * (a01 * a32 - a02 * a31) + a30 * (a01 * a22 - a02 * a21));
+    out[14] = -(a00 * (a11 * a32 - a12 * a31) - a10 * (a01 * a32 - a02 * a31) + a30 * (a01 * a12 - a02 * a11));
+    out[15] =  (a00 * (a11 * a22 - a12 * a21) - a10 * (a01 * a22 - a02 * a21) + a20 * (a01 * a12 - a02 * a11));
     return out;
 };
 },{}],16:[function(require,module,exports){
@@ -329,40 +601,6 @@ function invert(out, a) {
     out[14] = (a31 * b01 - a30 * b03 - a32 * b00) * det;
     out[15] = (a20 * b03 - a21 * b01 + a22 * b00) * det;
 
-    return out;
-};
-},{}],17:[function(require,module,exports){
-module.exports = adjoint;
-
-/**
- * Calculates the adjugate of a mat4
- *
- * @param {mat4} out the receiving matrix
- * @param {mat4} a the source matrix
- * @returns {mat4} out
- */
-function adjoint(out, a) {
-    var a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
-        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
-        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
-        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
-
-    out[0]  =  (a11 * (a22 * a33 - a23 * a32) - a21 * (a12 * a33 - a13 * a32) + a31 * (a12 * a23 - a13 * a22));
-    out[1]  = -(a01 * (a22 * a33 - a23 * a32) - a21 * (a02 * a33 - a03 * a32) + a31 * (a02 * a23 - a03 * a22));
-    out[2]  =  (a01 * (a12 * a33 - a13 * a32) - a11 * (a02 * a33 - a03 * a32) + a31 * (a02 * a13 - a03 * a12));
-    out[3]  = -(a01 * (a12 * a23 - a13 * a22) - a11 * (a02 * a23 - a03 * a22) + a21 * (a02 * a13 - a03 * a12));
-    out[4]  = -(a10 * (a22 * a33 - a23 * a32) - a20 * (a12 * a33 - a13 * a32) + a30 * (a12 * a23 - a13 * a22));
-    out[5]  =  (a00 * (a22 * a33 - a23 * a32) - a20 * (a02 * a33 - a03 * a32) + a30 * (a02 * a23 - a03 * a22));
-    out[6]  = -(a00 * (a12 * a33 - a13 * a32) - a10 * (a02 * a33 - a03 * a32) + a30 * (a02 * a13 - a03 * a12));
-    out[7]  =  (a00 * (a12 * a23 - a13 * a22) - a10 * (a02 * a23 - a03 * a22) + a20 * (a02 * a13 - a03 * a12));
-    out[8]  =  (a10 * (a21 * a33 - a23 * a31) - a20 * (a11 * a33 - a13 * a31) + a30 * (a11 * a23 - a13 * a21));
-    out[9]  = -(a00 * (a21 * a33 - a23 * a31) - a20 * (a01 * a33 - a03 * a31) + a30 * (a01 * a23 - a03 * a21));
-    out[10] =  (a00 * (a11 * a33 - a13 * a31) - a10 * (a01 * a33 - a03 * a31) + a30 * (a01 * a13 - a03 * a11));
-    out[11] = -(a00 * (a11 * a23 - a13 * a21) - a10 * (a01 * a23 - a03 * a21) + a20 * (a01 * a13 - a03 * a11));
-    out[12] = -(a10 * (a21 * a32 - a22 * a31) - a20 * (a11 * a32 - a12 * a31) + a30 * (a11 * a22 - a12 * a21));
-    out[13] =  (a00 * (a21 * a32 - a22 * a31) - a20 * (a01 * a32 - a02 * a31) + a30 * (a01 * a22 - a02 * a21));
-    out[14] = -(a00 * (a11 * a32 - a12 * a31) - a10 * (a01 * a32 - a02 * a31) + a30 * (a01 * a12 - a02 * a11));
-    out[15] =  (a00 * (a11 * a22 - a12 * a21) - a10 * (a01 * a22 - a02 * a21) + a20 * (a01 * a12 - a02 * a11));
     return out;
 };
 },{}],18:[function(require,module,exports){
@@ -710,6 +948,54 @@ function rotateZ(out, a, rad) {
     out[7] = a13 * c - a03 * s;
     return out;
 };
+},{}],27:[function(require,module,exports){
+module.exports = fromQuat;
+
+/**
+ * Creates a matrix from a quaternion rotation.
+ *
+ * @param {mat4} out mat4 receiving operation result
+ * @param {quat4} q Rotation quaternion
+ * @returns {mat4} out
+ */
+function fromQuat(out, q) {
+    var x = q[0], y = q[1], z = q[2], w = q[3],
+        x2 = x + x,
+        y2 = y + y,
+        z2 = z + z,
+
+        xx = x * x2,
+        yx = y * x2,
+        yy = y * y2,
+        zx = z * x2,
+        zy = z * y2,
+        zz = z * z2,
+        wx = w * x2,
+        wy = w * y2,
+        wz = w * z2;
+
+    out[0] = 1 - yy - zz;
+    out[1] = yx + wz;
+    out[2] = zx - wy;
+    out[3] = 0;
+
+    out[4] = yx - wz;
+    out[5] = 1 - xx - zz;
+    out[6] = zy + wx;
+    out[7] = 0;
+
+    out[8] = zx + wy;
+    out[9] = zy - wx;
+    out[10] = 1 - xx - yy;
+    out[11] = 0;
+
+    out[12] = 0;
+    out[13] = 0;
+    out[14] = 0;
+    out[15] = 1;
+
+    return out;
+};
 },{}],26:[function(require,module,exports){
 module.exports = fromRotationTranslation;
 
@@ -764,54 +1050,6 @@ function fromRotationTranslation(out, q, v) {
     
     return out;
 };
-},{}],27:[function(require,module,exports){
-module.exports = fromQuat;
-
-/**
- * Creates a matrix from a quaternion rotation.
- *
- * @param {mat4} out mat4 receiving operation result
- * @param {quat4} q Rotation quaternion
- * @returns {mat4} out
- */
-function fromQuat(out, q) {
-    var x = q[0], y = q[1], z = q[2], w = q[3],
-        x2 = x + x,
-        y2 = y + y,
-        z2 = z + z,
-
-        xx = x * x2,
-        yx = y * x2,
-        yy = y * y2,
-        zx = z * x2,
-        zy = z * y2,
-        zz = z * z2,
-        wx = w * x2,
-        wy = w * y2,
-        wz = w * z2;
-
-    out[0] = 1 - yy - zz;
-    out[1] = yx + wz;
-    out[2] = zx - wy;
-    out[3] = 0;
-
-    out[4] = yx - wz;
-    out[5] = 1 - xx - zz;
-    out[6] = zy + wx;
-    out[7] = 0;
-
-    out[8] = zx + wy;
-    out[9] = zy - wx;
-    out[10] = 1 - xx - yy;
-    out[11] = 0;
-
-    out[12] = 0;
-    out[13] = 0;
-    out[14] = 0;
-    out[15] = 1;
-
-    return out;
-};
 },{}],28:[function(require,module,exports){
 module.exports = frustum;
 
@@ -849,557 +1087,7 @@ function frustum(out, left, right, bottom, top, near, far) {
     out[15] = 0;
     return out;
 };
-},{}],29:[function(require,module,exports){
-module.exports = perspective;
-
-/**
- * Generates a perspective projection matrix with the given bounds
- *
- * @param {mat4} out mat4 frustum matrix will be written into
- * @param {number} fovy Vertical field of view in radians
- * @param {number} aspect Aspect ratio. typically viewport width/height
- * @param {number} near Near bound of the frustum
- * @param {number} far Far bound of the frustum
- * @returns {mat4} out
- */
-function perspective(out, fovy, aspect, near, far) {
-    var f = 1.0 / Math.tan(fovy / 2),
-        nf = 1 / (near - far);
-    out[0] = f / aspect;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 0;
-    out[5] = f;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = 0;
-    out[9] = 0;
-    out[10] = (far + near) * nf;
-    out[11] = -1;
-    out[12] = 0;
-    out[13] = 0;
-    out[14] = (2 * far * near) * nf;
-    out[15] = 0;
-    return out;
-};
-},{}],30:[function(require,module,exports){
-module.exports = ortho;
-
-/**
- * Generates a orthogonal projection matrix with the given bounds
- *
- * @param {mat4} out mat4 frustum matrix will be written into
- * @param {number} left Left bound of the frustum
- * @param {number} right Right bound of the frustum
- * @param {number} bottom Bottom bound of the frustum
- * @param {number} top Top bound of the frustum
- * @param {number} near Near bound of the frustum
- * @param {number} far Far bound of the frustum
- * @returns {mat4} out
- */
-function ortho(out, left, right, bottom, top, near, far) {
-    var lr = 1 / (left - right),
-        bt = 1 / (bottom - top),
-        nf = 1 / (near - far);
-    out[0] = -2 * lr;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 0;
-    out[5] = -2 * bt;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = 0;
-    out[9] = 0;
-    out[10] = 2 * nf;
-    out[11] = 0;
-    out[12] = (left + right) * lr;
-    out[13] = (top + bottom) * bt;
-    out[14] = (far + near) * nf;
-    out[15] = 1;
-    return out;
-};
-},{}],31:[function(require,module,exports){
-module.exports = lookAt;
-
-/**
- * Generates a look-at matrix with the given eye position, focal point, and up axis
- *
- * @param {mat4} out mat4 frustum matrix will be written into
- * @param {vec3} eye Position of the viewer
- * @param {vec3} center Point the viewer is looking at
- * @param {vec3} up vec3 pointing up
- * @returns {mat4} out
- */
-function lookAt(out, eye, center, up) {
-    var x0, x1, x2, y0, y1, y2, z0, z1, z2, len,
-        eyex = eye[0],
-        eyey = eye[1],
-        eyez = eye[2],
-        upx = up[0],
-        upy = up[1],
-        upz = up[2],
-        centerx = center[0],
-        centery = center[1],
-        centerz = center[2];
-
-    if (Math.abs(eyex - centerx) < 0.000001 &&
-        Math.abs(eyey - centery) < 0.000001 &&
-        Math.abs(eyez - centerz) < 0.000001) {
-        return mat4.identity(out);
-    }
-
-    z0 = eyex - centerx;
-    z1 = eyey - centery;
-    z2 = eyez - centerz;
-
-    len = 1 / Math.sqrt(z0 * z0 + z1 * z1 + z2 * z2);
-    z0 *= len;
-    z1 *= len;
-    z2 *= len;
-
-    x0 = upy * z2 - upz * z1;
-    x1 = upz * z0 - upx * z2;
-    x2 = upx * z1 - upy * z0;
-    len = Math.sqrt(x0 * x0 + x1 * x1 + x2 * x2);
-    if (!len) {
-        x0 = 0;
-        x1 = 0;
-        x2 = 0;
-    } else {
-        len = 1 / len;
-        x0 *= len;
-        x1 *= len;
-        x2 *= len;
-    }
-
-    y0 = z1 * x2 - z2 * x1;
-    y1 = z2 * x0 - z0 * x2;
-    y2 = z0 * x1 - z1 * x0;
-
-    len = Math.sqrt(y0 * y0 + y1 * y1 + y2 * y2);
-    if (!len) {
-        y0 = 0;
-        y1 = 0;
-        y2 = 0;
-    } else {
-        len = 1 / len;
-        y0 *= len;
-        y1 *= len;
-        y2 *= len;
-    }
-
-    out[0] = x0;
-    out[1] = y0;
-    out[2] = z0;
-    out[3] = 0;
-    out[4] = x1;
-    out[5] = y1;
-    out[6] = z1;
-    out[7] = 0;
-    out[8] = x2;
-    out[9] = y2;
-    out[10] = z2;
-    out[11] = 0;
-    out[12] = -(x0 * eyex + x1 * eyey + x2 * eyez);
-    out[13] = -(y0 * eyex + y1 * eyey + y2 * eyez);
-    out[14] = -(z0 * eyex + z1 * eyey + z2 * eyez);
-    out[15] = 1;
-
-    return out;
-};
-},{}],32:[function(require,module,exports){
-module.exports = str;
-
-/**
- * Returns a string representation of a mat4
- *
- * @param {mat4} mat matrix to represent as a string
- * @returns {String} string representation of the matrix
- */
-function str(a) {
-    return 'mat4(' + a[0] + ', ' + a[1] + ', ' + a[2] + ', ' + a[3] + ', ' +
-                    a[4] + ', ' + a[5] + ', ' + a[6] + ', ' + a[7] + ', ' +
-                    a[8] + ', ' + a[9] + ', ' + a[10] + ', ' + a[11] + ', ' + 
-                    a[12] + ', ' + a[13] + ', ' + a[14] + ', ' + a[15] + ')';
-};
-},{}],33:[function(require,module,exports){
-// shim for using process in browser
-
-var process = module.exports = {};
-
-process.nextTick = (function () {
-    var canSetImmediate = typeof window !== 'undefined'
-    && window.setImmediate;
-    var canPost = typeof window !== 'undefined'
-    && window.postMessage && window.addEventListener
-    ;
-
-    if (canSetImmediate) {
-        return function (f) { return window.setImmediate(f) };
-    }
-
-    if (canPost) {
-        var queue = [];
-        window.addEventListener('message', function (ev) {
-            if (ev.source === window && ev.data === 'process-tick') {
-                ev.stopPropagation();
-                if (queue.length > 0) {
-                    var fn = queue.shift();
-                    fn();
-                }
-            }
-        }, true);
-
-        return function nextTick(fn) {
-            queue.push(fn);
-            window.postMessage('process-tick', '*');
-        };
-    }
-
-    return function nextTick(fn) {
-        setTimeout(fn, 0);
-    };
-})();
-
-process.title = 'browser';
-process.browser = true;
-process.env = {};
-process.argv = [];
-
-process.binding = function (name) {
-    throw new Error('process.binding is not supported');
-}
-
-// TODO(shtylman)
-process.cwd = function () { return '/' };
-process.chdir = function (dir) {
-    throw new Error('process.chdir is not supported');
-};
-
-},{}],34:[function(require,module,exports){
-(function(process){function filter (xs, fn) {
-    var res = [];
-    for (var i = 0; i < xs.length; i++) {
-        if (fn(xs[i], i, xs)) res.push(xs[i]);
-    }
-    return res;
-}
-
-// resolves . and .. elements in a path array with directory names there
-// must be no slashes, empty elements, or device names (c:\) in the array
-// (so also no leading and trailing slashes - it does not distinguish
-// relative and absolute paths)
-function normalizeArray(parts, allowAboveRoot) {
-  // if the path tries to go above the root, `up` ends up > 0
-  var up = 0;
-  for (var i = parts.length; i >= 0; i--) {
-    var last = parts[i];
-    if (last == '.') {
-      parts.splice(i, 1);
-    } else if (last === '..') {
-      parts.splice(i, 1);
-      up++;
-    } else if (up) {
-      parts.splice(i, 1);
-      up--;
-    }
-  }
-
-  // if the path is allowed to go above the root, restore leading ..s
-  if (allowAboveRoot) {
-    for (; up--; up) {
-      parts.unshift('..');
-    }
-  }
-
-  return parts;
-}
-
-// Regex to split a filename into [*, dir, basename, ext]
-// posix version
-var splitPathRe = /^(.+\/(?!$)|\/)?((?:.+?)?(\.[^.]*)?)$/;
-
-// path.resolve([from ...], to)
-// posix version
-exports.resolve = function() {
-var resolvedPath = '',
-    resolvedAbsolute = false;
-
-for (var i = arguments.length; i >= -1 && !resolvedAbsolute; i--) {
-  var path = (i >= 0)
-      ? arguments[i]
-      : process.cwd();
-
-  // Skip empty and invalid entries
-  if (typeof path !== 'string' || !path) {
-    continue;
-  }
-
-  resolvedPath = path + '/' + resolvedPath;
-  resolvedAbsolute = path.charAt(0) === '/';
-}
-
-// At this point the path should be resolved to a full absolute path, but
-// handle relative paths to be safe (might happen when process.cwd() fails)
-
-// Normalize the path
-resolvedPath = normalizeArray(filter(resolvedPath.split('/'), function(p) {
-    return !!p;
-  }), !resolvedAbsolute).join('/');
-
-  return ((resolvedAbsolute ? '/' : '') + resolvedPath) || '.';
-};
-
-// path.normalize(path)
-// posix version
-exports.normalize = function(path) {
-var isAbsolute = path.charAt(0) === '/',
-    trailingSlash = path.slice(-1) === '/';
-
-// Normalize the path
-path = normalizeArray(filter(path.split('/'), function(p) {
-    return !!p;
-  }), !isAbsolute).join('/');
-
-  if (!path && !isAbsolute) {
-    path = '.';
-  }
-  if (path && trailingSlash) {
-    path += '/';
-  }
-  
-  return (isAbsolute ? '/' : '') + path;
-};
-
-
-// posix version
-exports.join = function() {
-  var paths = Array.prototype.slice.call(arguments, 0);
-  return exports.normalize(filter(paths, function(p, index) {
-    return p && typeof p === 'string';
-  }).join('/'));
-};
-
-
-exports.dirname = function(path) {
-  var dir = splitPathRe.exec(path)[1] || '';
-  var isWindows = false;
-  if (!dir) {
-    // No dirname
-    return '.';
-  } else if (dir.length === 1 ||
-      (isWindows && dir.length <= 3 && dir.charAt(1) === ':')) {
-    // It is just a slash or a drive letter with a slash
-    return dir;
-  } else {
-    // It is a full dirname, strip trailing slash
-    return dir.substring(0, dir.length - 1);
-  }
-};
-
-
-exports.basename = function(path, ext) {
-  var f = splitPathRe.exec(path)[2] || '';
-  // TODO: make this comparison case-insensitive on windows?
-  if (ext && f.substr(-1 * ext.length) === ext) {
-    f = f.substr(0, f.length - ext.length);
-  }
-  return f;
-};
-
-
-exports.extname = function(path) {
-  return splitPathRe.exec(path)[3] || '';
-};
-
-exports.relative = function(from, to) {
-  from = exports.resolve(from).substr(1);
-  to = exports.resolve(to).substr(1);
-
-  function trim(arr) {
-    var start = 0;
-    for (; start < arr.length; start++) {
-      if (arr[start] !== '') break;
-    }
-
-    var end = arr.length - 1;
-    for (; end >= 0; end--) {
-      if (arr[end] !== '') break;
-    }
-
-    if (start > end) return [];
-    return arr.slice(start, end - start + 1);
-  }
-
-  var fromParts = trim(from.split('/'));
-  var toParts = trim(to.split('/'));
-
-  var length = Math.min(fromParts.length, toParts.length);
-  var samePartsLength = length;
-  for (var i = 0; i < length; i++) {
-    if (fromParts[i] !== toParts[i]) {
-      samePartsLength = i;
-      break;
-    }
-  }
-
-  var outputParts = [];
-  for (var i = samePartsLength; i < fromParts.length; i++) {
-    outputParts.push('..');
-  }
-
-  outputParts = outputParts.concat(toParts.slice(samePartsLength));
-
-  return outputParts.join('/');
-};
-
-})(require("__browserify_process"))
-},{"__browserify_process":33}],3:[function(require,module,exports){
-"use strict"
-
-var makeGameShell = require("game-shell")
-var webglew = require("webglew")
-
-function createGLShell(options) {
-  options = options || {}
-  
-  var extensions = options.extensions || []
-
-  //First create shell
-  var shell = makeGameShell(options)
-  var scale = shell.scale || 1
-  var contextOptions = options.glOptions
-
-  shell.on("init", function initGLNow() {
-  
-    //Create canvas
-    var canvas = document.createElement("canvas")
-    
-    //Try initializing WebGL
-    var gl = canvas.getContext("webgl", contextOptions) || 
-             canvas.getContext("experimental-webgl", contextOptions)
-    if(!gl) {
-      shell.emit("gl-error", new Error("Unable to initialize WebGL"))
-      return
-    }
-    
-    //Check extensions
-    var ext = webglew(gl)
-    for(var i=0; i<extensions.length; ++i) {
-      if(!(extensions[i] in ext)) {
-        shell.emit("gl-error", new Error("Missing extension: " + extensions[i]))
-        return
-      }
-    }
-
-    //Set canvas style
-    canvas.style.position = "absolute"
-    canvas.style.left = "0px"
-    canvas.style.top = "0px"
-    shell.element.appendChild(canvas)
-
-    //Add variables to game-shell
-    shell.canvas = canvas
-    shell.gl = gl
-
-    //Load width/height
-    resize()
-
-    //Load default parameters
-    shell.clearFlags = options.clearFlags === undefined ? (gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT) : options.clearFlags
-    shell.clearColor = options.clearColor || [0,0,0,0]
-    shell.clearDepth = options.clearDepth || 1.0
-    shell.clearStencil = options.clearStencil || 0
-
-    shell.on("resize", resize)
-
-    //Hook render event
-    shell.on("render", function renderGLNow(t) {
-    
-      //Bind default framebuffer
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
-      
-      //Set viewport
-      gl.viewport(0, 0, (shell._width / scale)|0, (shell._height / scale)|0)
-
-      //Clear buffers
-      if(shell.clearFlags & gl.STENCIL_BUFFER_BIT) {
-        gl.clearStencil(shell.clearStencil)
-      }
-      if(shell.clearFlags & gl.COLOR_BUFFER_BIT) {
-        gl.clearColor(shell.clearColor[0], shell.clearColor[1], shell.clearColor[2], shell.clearColor[3])
-      }
-      if(shell.clearFlags & gl.DEPTH_BUFFER_BIT) {
-        gl.clearDepth(shell.clearDepth)
-      }
-      if(shell.clearFlags) {
-        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT)
-      }
-    
-      //Render frame
-      shell.emit("gl-render", t)
-    })
-    
-    //WebGL initialized
-    shell.emit("gl-init")
-  })
-
-  function resize() {
-    var nw = (shell._width/scale)|0
-    var nh = (shell._height/scale)|0
-    shell.canvas.width = nw
-    shell.canvas.height = nh
-    shell.canvas.style.width = shell._width + 'px'
-    shell.canvas.style.height = shell._height + 'px'
-    shell.emit("gl-resize", nw, nh)
-  }
-
-  Object.defineProperty(shell, 'scale', {
-    get: function() {
-      return scale
-    },
-    set: function(_scale) {
-      _scale = +_scale
-      if((_scale <= 0) || isNaN(_scale) || (scale === _scale)) {
-        return scale
-      }
-      scale = _scale
-      resize()
-      return scale
-    }
-  })
-
-  Object.defineProperty(shell, "width", {
-    get: function() {
-      return (shell._width / scale)|0
-    }
-  })
-
-  Object.defineProperty(shell, "height", {
-    get: function() {
-      return (shell._height / scale)|0
-    }
-  })
-
-  Object.defineProperty(shell, "mouse", {
-    get: function() {
-      return [shell.mouseX/scale, shell.mouseY/scale]
-    }
-  })
-
-  Object.defineProperty(shell, "prevMouse", {
-    get: function() {
-      return [shell.prevMouseX/scale, shell.prevMouseY/scale]
-    }
-  })
-
-  return shell
-}
-
-module.exports = createGLShell
-},{"game-shell":35,"webglew":36}],10:[function(require,module,exports){
+},{}],10:[function(require,module,exports){
 var punycode = { encode : function (s) { return s } };
 
 exports.parse = urlParse;
@@ -2005,7 +1693,41 @@ function parseHost(host) {
   return out;
 }
 
-},{"querystring":37}],4:[function(require,module,exports){
+},{"querystring":35}],29:[function(require,module,exports){
+module.exports = perspective;
+
+/**
+ * Generates a perspective projection matrix with the given bounds
+ *
+ * @param {mat4} out mat4 frustum matrix will be written into
+ * @param {number} fovy Vertical field of view in radians
+ * @param {number} aspect Aspect ratio. typically viewport width/height
+ * @param {number} near Near bound of the frustum
+ * @param {number} far Far bound of the frustum
+ * @returns {mat4} out
+ */
+function perspective(out, fovy, aspect, near, far) {
+    var f = 1.0 / Math.tan(fovy / 2),
+        nf = 1 / (near - far);
+    out[0] = f / aspect;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = 0;
+    out[5] = f;
+    out[6] = 0;
+    out[7] = 0;
+    out[8] = 0;
+    out[9] = 0;
+    out[10] = (far + near) * nf;
+    out[11] = -1;
+    out[12] = 0;
+    out[13] = 0;
+    out[14] = (2 * far * near) * nf;
+    out[15] = 0;
+    return out;
+};
+},{}],3:[function(require,module,exports){
 "use strict"
 
 var createOrbitCamera = require("orbit-camera")
@@ -2041,7 +1763,610 @@ function attachCamera(shell) {
 }
 
 module.exports = attachCamera
-},{"orbit-camera":38}],39:[function(require,module,exports){
+},{"orbit-camera":36}],5:[function(require,module,exports){
+"use strict"
+
+var makeGameShell = require("game-shell")
+var webglew = require("webglew")
+
+function createGLShell(options) {
+  options = options || {}
+  
+  var extensions = options.extensions || []
+
+  //First create shell
+  var shell = makeGameShell(options)
+  var scale = shell.scale || 1
+  var contextOptions = options.glOptions
+
+  shell.on("init", function initGLNow() {
+  
+    //Create canvas
+    var canvas = document.createElement("canvas")
+    
+    //Try initializing WebGL
+    var gl = canvas.getContext("webgl", contextOptions) || 
+             canvas.getContext("experimental-webgl", contextOptions)
+    if(!gl) {
+      shell.emit("gl-error", new Error("Unable to initialize WebGL"))
+      return
+    }
+    
+    //Check extensions
+    var ext = webglew(gl)
+    for(var i=0; i<extensions.length; ++i) {
+      if(!(extensions[i] in ext)) {
+        shell.emit("gl-error", new Error("Missing extension: " + extensions[i]))
+        return
+      }
+    }
+
+    //Set canvas style
+    canvas.style.position = "absolute"
+    canvas.style.left = "0px"
+    canvas.style.top = "0px"
+    shell.element.appendChild(canvas)
+
+    //Add variables to game-shell
+    shell.canvas = canvas
+    shell.gl = gl
+
+    //Load width/height
+    resize()
+
+    //Load default parameters
+    shell.clearFlags = options.clearFlags === undefined ? (gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT) : options.clearFlags
+    shell.clearColor = options.clearColor || [0,0,0,0]
+    shell.clearDepth = options.clearDepth || 1.0
+    shell.clearStencil = options.clearStencil || 0
+
+    shell.on("resize", resize)
+
+    //Hook render event
+    shell.on("render", function renderGLNow(t) {
+    
+      //Bind default framebuffer
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+      
+      //Set viewport
+      gl.viewport(0, 0, (shell._width / scale)|0, (shell._height / scale)|0)
+
+      //Clear buffers
+      if(shell.clearFlags & gl.STENCIL_BUFFER_BIT) {
+        gl.clearStencil(shell.clearStencil)
+      }
+      if(shell.clearFlags & gl.COLOR_BUFFER_BIT) {
+        gl.clearColor(shell.clearColor[0], shell.clearColor[1], shell.clearColor[2], shell.clearColor[3])
+      }
+      if(shell.clearFlags & gl.DEPTH_BUFFER_BIT) {
+        gl.clearDepth(shell.clearDepth)
+      }
+      if(shell.clearFlags) {
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT)
+      }
+    
+      //Render frame
+      shell.emit("gl-render", t)
+    })
+    
+    //WebGL initialized
+    shell.emit("gl-init")
+  })
+
+  function resize() {
+    var nw = (shell._width/scale)|0
+    var nh = (shell._height/scale)|0
+    shell.canvas.width = nw
+    shell.canvas.height = nh
+    shell.canvas.style.width = shell._width + 'px'
+    shell.canvas.style.height = shell._height + 'px'
+    shell.emit("gl-resize", nw, nh)
+  }
+
+  Object.defineProperty(shell, 'scale', {
+    get: function() {
+      return scale
+    },
+    set: function(_scale) {
+      _scale = +_scale
+      if((_scale <= 0) || isNaN(_scale) || (scale === _scale)) {
+        return scale
+      }
+      scale = _scale
+      resize()
+      return scale
+    }
+  })
+
+  Object.defineProperty(shell, "width", {
+    get: function() {
+      return (shell._width / scale)|0
+    }
+  })
+
+  Object.defineProperty(shell, "height", {
+    get: function() {
+      return (shell._height / scale)|0
+    }
+  })
+
+  Object.defineProperty(shell, "mouse", {
+    get: function() {
+      return [shell.mouseX/scale, shell.mouseY/scale]
+    }
+  })
+
+  Object.defineProperty(shell, "prevMouse", {
+    get: function() {
+      return [shell.prevMouseX/scale, shell.prevMouseY/scale]
+    }
+  })
+
+  return shell
+}
+
+module.exports = createGLShell
+},{"webglew":37,"game-shell":38}],30:[function(require,module,exports){
+module.exports = ortho;
+
+/**
+ * Generates a orthogonal projection matrix with the given bounds
+ *
+ * @param {mat4} out mat4 frustum matrix will be written into
+ * @param {number} left Left bound of the frustum
+ * @param {number} right Right bound of the frustum
+ * @param {number} bottom Bottom bound of the frustum
+ * @param {number} top Top bound of the frustum
+ * @param {number} near Near bound of the frustum
+ * @param {number} far Far bound of the frustum
+ * @returns {mat4} out
+ */
+function ortho(out, left, right, bottom, top, near, far) {
+    var lr = 1 / (left - right),
+        bt = 1 / (bottom - top),
+        nf = 1 / (near - far);
+    out[0] = -2 * lr;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = 0;
+    out[5] = -2 * bt;
+    out[6] = 0;
+    out[7] = 0;
+    out[8] = 0;
+    out[9] = 0;
+    out[10] = 2 * nf;
+    out[11] = 0;
+    out[12] = (left + right) * lr;
+    out[13] = (top + bottom) * bt;
+    out[14] = (far + near) * nf;
+    out[15] = 1;
+    return out;
+};
+},{}],31:[function(require,module,exports){
+module.exports = lookAt;
+
+/**
+ * Generates a look-at matrix with the given eye position, focal point, and up axis
+ *
+ * @param {mat4} out mat4 frustum matrix will be written into
+ * @param {vec3} eye Position of the viewer
+ * @param {vec3} center Point the viewer is looking at
+ * @param {vec3} up vec3 pointing up
+ * @returns {mat4} out
+ */
+function lookAt(out, eye, center, up) {
+    var x0, x1, x2, y0, y1, y2, z0, z1, z2, len,
+        eyex = eye[0],
+        eyey = eye[1],
+        eyez = eye[2],
+        upx = up[0],
+        upy = up[1],
+        upz = up[2],
+        centerx = center[0],
+        centery = center[1],
+        centerz = center[2];
+
+    if (Math.abs(eyex - centerx) < 0.000001 &&
+        Math.abs(eyey - centery) < 0.000001 &&
+        Math.abs(eyez - centerz) < 0.000001) {
+        return mat4.identity(out);
+    }
+
+    z0 = eyex - centerx;
+    z1 = eyey - centery;
+    z2 = eyez - centerz;
+
+    len = 1 / Math.sqrt(z0 * z0 + z1 * z1 + z2 * z2);
+    z0 *= len;
+    z1 *= len;
+    z2 *= len;
+
+    x0 = upy * z2 - upz * z1;
+    x1 = upz * z0 - upx * z2;
+    x2 = upx * z1 - upy * z0;
+    len = Math.sqrt(x0 * x0 + x1 * x1 + x2 * x2);
+    if (!len) {
+        x0 = 0;
+        x1 = 0;
+        x2 = 0;
+    } else {
+        len = 1 / len;
+        x0 *= len;
+        x1 *= len;
+        x2 *= len;
+    }
+
+    y0 = z1 * x2 - z2 * x1;
+    y1 = z2 * x0 - z0 * x2;
+    y2 = z0 * x1 - z1 * x0;
+
+    len = Math.sqrt(y0 * y0 + y1 * y1 + y2 * y2);
+    if (!len) {
+        y0 = 0;
+        y1 = 0;
+        y2 = 0;
+    } else {
+        len = 1 / len;
+        y0 *= len;
+        y1 *= len;
+        y2 *= len;
+    }
+
+    out[0] = x0;
+    out[1] = y0;
+    out[2] = z0;
+    out[3] = 0;
+    out[4] = x1;
+    out[5] = y1;
+    out[6] = z1;
+    out[7] = 0;
+    out[8] = x2;
+    out[9] = y2;
+    out[10] = z2;
+    out[11] = 0;
+    out[12] = -(x0 * eyex + x1 * eyey + x2 * eyez);
+    out[13] = -(y0 * eyex + y1 * eyey + y2 * eyez);
+    out[14] = -(z0 * eyex + z1 * eyey + z2 * eyez);
+    out[15] = 1;
+
+    return out;
+};
+},{}],32:[function(require,module,exports){
+module.exports = str;
+
+/**
+ * Returns a string representation of a mat4
+ *
+ * @param {mat4} mat matrix to represent as a string
+ * @returns {String} string representation of the matrix
+ */
+function str(a) {
+    return 'mat4(' + a[0] + ', ' + a[1] + ', ' + a[2] + ', ' + a[3] + ', ' +
+                    a[4] + ', ' + a[5] + ', ' + a[6] + ', ' + a[7] + ', ' +
+                    a[8] + ', ' + a[9] + ', ' + a[10] + ', ' + a[11] + ', ' + 
+                    a[12] + ', ' + a[13] + ', ' + a[14] + ', ' + a[15] + ')';
+};
+},{}],35:[function(require,module,exports){
+
+/**
+ * Object#toString() ref for stringify().
+ */
+
+var toString = Object.prototype.toString;
+
+/**
+ * Array#indexOf shim.
+ */
+
+var indexOf = typeof Array.prototype.indexOf === 'function'
+  ? function(arr, el) { return arr.indexOf(el); }
+  : function(arr, el) {
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i] === el) return i;
+      }
+      return -1;
+    };
+
+/**
+ * Array.isArray shim.
+ */
+
+var isArray = Array.isArray || function(arr) {
+  return toString.call(arr) == '[object Array]';
+};
+
+/**
+ * Object.keys shim.
+ */
+
+var objectKeys = Object.keys || function(obj) {
+  var ret = [];
+  for (var key in obj) ret.push(key);
+  return ret;
+};
+
+/**
+ * Array#forEach shim.
+ */
+
+var forEach = typeof Array.prototype.forEach === 'function'
+  ? function(arr, fn) { return arr.forEach(fn); }
+  : function(arr, fn) {
+      for (var i = 0; i < arr.length; i++) fn(arr[i]);
+    };
+
+/**
+ * Array#reduce shim.
+ */
+
+var reduce = function(arr, fn, initial) {
+  if (typeof arr.reduce === 'function') return arr.reduce(fn, initial);
+  var res = initial;
+  for (var i = 0; i < arr.length; i++) res = fn(res, arr[i]);
+  return res;
+};
+
+/**
+ * Cache non-integer test regexp.
+ */
+
+var isint = /^[0-9]+$/;
+
+function promote(parent, key) {
+  if (parent[key].length == 0) return parent[key] = {};
+  var t = {};
+  for (var i in parent[key]) t[i] = parent[key][i];
+  parent[key] = t;
+  return t;
+}
+
+function parse(parts, parent, key, val) {
+  var part = parts.shift();
+  // end
+  if (!part) {
+    if (isArray(parent[key])) {
+      parent[key].push(val);
+    } else if ('object' == typeof parent[key]) {
+      parent[key] = val;
+    } else if ('undefined' == typeof parent[key]) {
+      parent[key] = val;
+    } else {
+      parent[key] = [parent[key], val];
+    }
+    // array
+  } else {
+    var obj = parent[key] = parent[key] || [];
+    if (']' == part) {
+      if (isArray(obj)) {
+        if ('' != val) obj.push(val);
+      } else if ('object' == typeof obj) {
+        obj[objectKeys(obj).length] = val;
+      } else {
+        obj = parent[key] = [parent[key], val];
+      }
+      // prop
+    } else if (~indexOf(part, ']')) {
+      part = part.substr(0, part.length - 1);
+      if (!isint.test(part) && isArray(obj)) obj = promote(parent, key);
+      parse(parts, obj, part, val);
+      // key
+    } else {
+      if (!isint.test(part) && isArray(obj)) obj = promote(parent, key);
+      parse(parts, obj, part, val);
+    }
+  }
+}
+
+/**
+ * Merge parent key/val pair.
+ */
+
+function merge(parent, key, val){
+  if (~indexOf(key, ']')) {
+    var parts = key.split('[')
+      , len = parts.length
+      , last = len - 1;
+    parse(parts, parent, 'base', val);
+    // optimize
+  } else {
+    if (!isint.test(key) && isArray(parent.base)) {
+      var t = {};
+      for (var k in parent.base) t[k] = parent.base[k];
+      parent.base = t;
+    }
+    set(parent.base, key, val);
+  }
+
+  return parent;
+}
+
+/**
+ * Parse the given obj.
+ */
+
+function parseObject(obj){
+  var ret = { base: {} };
+  forEach(objectKeys(obj), function(name){
+    merge(ret, name, obj[name]);
+  });
+  return ret.base;
+}
+
+/**
+ * Parse the given str.
+ */
+
+function parseString(str){
+  return reduce(String(str).split('&'), function(ret, pair){
+    var eql = indexOf(pair, '=')
+      , brace = lastBraceInKey(pair)
+      , key = pair.substr(0, brace || eql)
+      , val = pair.substr(brace || eql, pair.length)
+      , val = val.substr(indexOf(val, '=') + 1, val.length);
+
+    // ?foo
+    if ('' == key) key = pair, val = '';
+    if ('' == key) return ret;
+
+    return merge(ret, decode(key), decode(val));
+  }, { base: {} }).base;
+}
+
+/**
+ * Parse the given query `str` or `obj`, returning an object.
+ *
+ * @param {String} str | {Object} obj
+ * @return {Object}
+ * @api public
+ */
+
+exports.parse = function(str){
+  if (null == str || '' == str) return {};
+  return 'object' == typeof str
+    ? parseObject(str)
+    : parseString(str);
+};
+
+/**
+ * Turn the given `obj` into a query string
+ *
+ * @param {Object} obj
+ * @return {String}
+ * @api public
+ */
+
+var stringify = exports.stringify = function(obj, prefix) {
+  if (isArray(obj)) {
+    return stringifyArray(obj, prefix);
+  } else if ('[object Object]' == toString.call(obj)) {
+    return stringifyObject(obj, prefix);
+  } else if ('string' == typeof obj) {
+    return stringifyString(obj, prefix);
+  } else {
+    return prefix + '=' + encodeURIComponent(String(obj));
+  }
+};
+
+/**
+ * Stringify the given `str`.
+ *
+ * @param {String} str
+ * @param {String} prefix
+ * @return {String}
+ * @api private
+ */
+
+function stringifyString(str, prefix) {
+  if (!prefix) throw new TypeError('stringify expects an object');
+  return prefix + '=' + encodeURIComponent(str);
+}
+
+/**
+ * Stringify the given `arr`.
+ *
+ * @param {Array} arr
+ * @param {String} prefix
+ * @return {String}
+ * @api private
+ */
+
+function stringifyArray(arr, prefix) {
+  var ret = [];
+  if (!prefix) throw new TypeError('stringify expects an object');
+  for (var i = 0; i < arr.length; i++) {
+    ret.push(stringify(arr[i], prefix + '[' + i + ']'));
+  }
+  return ret.join('&');
+}
+
+/**
+ * Stringify the given `obj`.
+ *
+ * @param {Object} obj
+ * @param {String} prefix
+ * @return {String}
+ * @api private
+ */
+
+function stringifyObject(obj, prefix) {
+  var ret = []
+    , keys = objectKeys(obj)
+    , key;
+
+  for (var i = 0, len = keys.length; i < len; ++i) {
+    key = keys[i];
+    if (null == obj[key]) {
+      ret.push(encodeURIComponent(key) + '=');
+    } else {
+      ret.push(stringify(obj[key], prefix
+        ? prefix + '[' + encodeURIComponent(key) + ']'
+        : encodeURIComponent(key)));
+    }
+  }
+
+  return ret.join('&');
+}
+
+/**
+ * Set `obj`'s `key` to `val` respecting
+ * the weird and wonderful syntax of a qs,
+ * where "foo=bar&foo=baz" becomes an array.
+ *
+ * @param {Object} obj
+ * @param {String} key
+ * @param {String} val
+ * @api private
+ */
+
+function set(obj, key, val) {
+  var v = obj[key];
+  if (undefined === v) {
+    obj[key] = val;
+  } else if (isArray(v)) {
+    v.push(val);
+  } else {
+    obj[key] = [v, val];
+  }
+}
+
+/**
+ * Locate last brace in `str` within the key.
+ *
+ * @param {String} str
+ * @return {Number}
+ * @api private
+ */
+
+function lastBraceInKey(str) {
+  var len = str.length
+    , brace
+    , c;
+  for (var i = 0; i < len; ++i) {
+    c = str[i];
+    if (']' == c) brace = false;
+    if ('[' == c) brace = true;
+    if ('=' == c && !brace) return i;
+  }
+}
+
+/**
+ * Decode `str`.
+ *
+ * @param {String} str
+ * @return {String}
+ * @api private
+ */
+
+function decode(str) {
+  try {
+    return decodeURIComponent(str.replace(/\+/g, ' '));
+  } catch (err) {
+    return str;
+  }
+}
+
+},{}],39:[function(require,module,exports){
 (function(){// (c) Dean McNamee <dean@gmail.com>, 2013.
 //
 // https://github.com/deanm/omggif
@@ -2773,7 +3098,138 @@ function GifReaderLZWOutputIndexStream(code_stream, p, output, output_length) {
 try { exports.GifWriter = GifWriter; exports.GifReader = GifReader } catch(e) { }  // CommonJS.
 
 })()
-},{}],40:[function(require,module,exports){
+},{}],4:[function(require,module,exports){
+(function(process){'use strict'
+
+var path          = require('path')
+var ndarray       = require('ndarray')
+var GifReader     = require('omggif').GifReader
+var pack          = require('ndarray-pack')
+var through       = require('through')
+var parseDataURI  = require('data-uri-to-buffer')
+
+function defaultImage(url, cb) {
+  var img = new Image()
+  img.onload = function() {
+    var canvas = document.createElement('canvas')
+    canvas.width = img.width
+    canvas.height = img.height
+    var context = canvas.getContext('2d')
+    context.drawImage(img, 0, 0)
+    var pixels = context.getImageData(0, 0, img.width, img.height)
+    cb(null, ndarray(new Uint8Array(pixels.data), [img.width, img.height, 4], [4, 4*img.width, 1], 0))
+  }
+  img.onerror = function(err) {
+    cb(err)
+  }
+  img.src = url
+}
+
+//Animated gif loading
+function handleGif(data, cb) {
+  var reader
+  try {
+    reader = new GifReader(data)
+  } catch(err) {
+    cb(err)
+    return
+  }
+  if(reader.numFrames() > 0) {
+    var nshape = [reader.numFrames(), reader.height, reader.width, 4]
+    var ndata = new Uint8Array(nshape[0] * nshape[1] * nshape[2] * nshape[3])
+    var result = ndarray(ndata, nshape)
+    try {
+      for(var i=0; i<reader.numFrames(); ++i) {
+        reader.decodeAndBlitFrameRGBA(i, ndata.subarray(
+          result.index(i, 0, 0, 0),
+          result.index(i+1, 0, 0, 0)))
+      }
+    } catch(err) {
+      cb(err)
+      return
+    }
+    cb(null, result.transpose(0,2,1))
+  } else {
+    var nshape = [reader.height, reader.width, 4]
+    var ndata = new Uint8Array(nshape[0] * nshape[1] * nshape[2])
+    var result = ndarray(ndata, nshape)
+    try {
+      reader.decodeAndBlitFrameRGBA(0, ndata)
+    } catch(err) {
+      cb(err)
+      return
+    }
+    cb(null, result.transpose(1,0))
+  }
+}
+
+function httpGif(url, cb) {
+  var xhr          = new XMLHttpRequest()
+  xhr.responseType = 'arraybuffer'
+  xhr.overrideMimeType('application/binary')
+  xhr.onerror = function(err) {
+    cb(err)
+  }
+  xhr.onload = function() {
+    if(xhr.readyState !== 4) {
+      return
+    }
+    var data = new Uint8Array(xhr.response)
+    handleGif(data, cb)
+    return
+  }
+  xhr.open('GET', url, true)
+  xhr.send()
+}
+
+function copyBuffer(buffer) {
+  if(buffer[0] === undefined) {
+    var n = buffer.length
+    var result = new Uint8Array(n)
+    for(var i=0; i<n; ++i) {
+      result[i] = buffer.get(i)
+    }
+    return result
+  } else {
+    return new Uint8Array(buffer)
+  }
+}
+
+function dataGif(url, cb) {
+  process.nextTick(function() {
+    try {
+      var buffer = parseDataURI(url)
+      if(buffer) {
+        handleGif(copyBuffer(buffer), cb)
+      } else {
+        cb(new Error('Error parsing data URI'))
+      }
+    } catch(err) {
+      cb(err)
+    }
+  })
+}
+
+module.exports = function getPixels(url, type, cb) {
+  if(!cb) {
+    cb = type
+    type = ''
+  }
+  var ext = path.extname(url)
+  switch(type || ext.toUpperCase()) {
+    case '.GIF':
+      httpGif(url, cb)
+    break
+    default:
+      if(url.indexOf('data:image/gif;') === 0) {
+        dataGif(url, cb)
+      } else {
+        defaultImage(url, cb)
+      }
+  }
+}
+})(require("__browserify_process"))
+},{"path":34,"omggif":39,"ndarray-pack":40,"through":41,"data-uri-to-buffer":42,"ndarray":43,"__browserify_process":33}],44:[function(require,module,exports){
 require=(function(e,t,n,r){function i(r){if(!n[r]){if(!t[r]){if(e)return e(r);throw new Error("Cannot find module '"+r+"'")}var s=n[r]={exports:{}};t[r][0](function(e){var n=t[r][1][e];return i(n?n:e)},s,s.exports)}return n[r].exports}for(var s=0;s<r.length;s++)i(r[s]);return i})(typeof require!=="undefined"&&require,{1:[function(require,module,exports){
 // UTILITY
 var util = require('util');
@@ -6635,7 +7091,7 @@ SlowBuffer.prototype.writeDoubleBE = Buffer.prototype.writeDoubleBE;
 },{}]},{},[])
 ;;module.exports=require("buffer-browserify")
 
-},{}],41:[function(require,module,exports){
+},{}],42:[function(require,module,exports){
 (function(Buffer){
 /**
  * Module exports.
@@ -6692,138 +7148,7 @@ function dataUriToBuffer (uri) {
 }
 
 })(require("__browserify_Buffer").Buffer)
-},{"__browserify_Buffer":40}],5:[function(require,module,exports){
-(function(process){'use strict'
-
-var path          = require('path')
-var ndarray       = require('ndarray')
-var GifReader     = require('omggif').GifReader
-var pack          = require('ndarray-pack')
-var through       = require('through')
-var parseDataURI  = require('data-uri-to-buffer')
-
-function defaultImage(url, cb) {
-  var img = new Image()
-  img.onload = function() {
-    var canvas = document.createElement('canvas')
-    canvas.width = img.width
-    canvas.height = img.height
-    var context = canvas.getContext('2d')
-    context.drawImage(img, 0, 0)
-    var pixels = context.getImageData(0, 0, img.width, img.height)
-    cb(null, ndarray(new Uint8Array(pixels.data), [img.width, img.height, 4], [4, 4*img.width, 1], 0))
-  }
-  img.onerror = function(err) {
-    cb(err)
-  }
-  img.src = url
-}
-
-//Animated gif loading
-function handleGif(data, cb) {
-  var reader
-  try {
-    reader = new GifReader(data)
-  } catch(err) {
-    cb(err)
-    return
-  }
-  if(reader.numFrames() > 0) {
-    var nshape = [reader.numFrames(), reader.height, reader.width, 4]
-    var ndata = new Uint8Array(nshape[0] * nshape[1] * nshape[2] * nshape[3])
-    var result = ndarray(ndata, nshape)
-    try {
-      for(var i=0; i<reader.numFrames(); ++i) {
-        reader.decodeAndBlitFrameRGBA(i, ndata.subarray(
-          result.index(i, 0, 0, 0),
-          result.index(i+1, 0, 0, 0)))
-      }
-    } catch(err) {
-      cb(err)
-      return
-    }
-    cb(null, result.transpose(0,2,1))
-  } else {
-    var nshape = [reader.height, reader.width, 4]
-    var ndata = new Uint8Array(nshape[0] * nshape[1] * nshape[2])
-    var result = ndarray(ndata, nshape)
-    try {
-      reader.decodeAndBlitFrameRGBA(0, ndata)
-    } catch(err) {
-      cb(err)
-      return
-    }
-    cb(null, result.transpose(1,0))
-  }
-}
-
-function httpGif(url, cb) {
-  var xhr          = new XMLHttpRequest()
-  xhr.responseType = 'arraybuffer'
-  xhr.overrideMimeType('application/binary')
-  xhr.onerror = function(err) {
-    cb(err)
-  }
-  xhr.onload = function() {
-    if(xhr.readyState !== 4) {
-      return
-    }
-    var data = new Uint8Array(xhr.response)
-    handleGif(data, cb)
-    return
-  }
-  xhr.open('GET', url, true)
-  xhr.send()
-}
-
-function copyBuffer(buffer) {
-  if(buffer[0] === undefined) {
-    var n = buffer.length
-    var result = new Uint8Array(n)
-    for(var i=0; i<n; ++i) {
-      result[i] = buffer.get(i)
-    }
-    return result
-  } else {
-    return new Uint8Array(buffer)
-  }
-}
-
-function dataGif(url, cb) {
-  process.nextTick(function() {
-    try {
-      var buffer = parseDataURI(url)
-      if(buffer) {
-        handleGif(copyBuffer(buffer), cb)
-      } else {
-        cb(new Error('Error parsing data URI'))
-      }
-    } catch(err) {
-      cb(err)
-    }
-  })
-}
-
-module.exports = function getPixels(url, type, cb) {
-  if(!cb) {
-    cb = type
-    type = ''
-  }
-  var ext = path.extname(url)
-  switch(type || ext.toUpperCase()) {
-    case '.GIF':
-      httpGif(url, cb)
-    break
-    default:
-      if(url.indexOf('data:image/gif;') === 0) {
-        dataGif(url, cb)
-      } else {
-        defaultImage(url, cb)
-      }
-  }
-}
-})(require("__browserify_process"))
-},{"path":34,"omggif":39,"ndarray-pack":42,"through":43,"data-uri-to-buffer":41,"ndarray":44,"__browserify_process":33}],43:[function(require,module,exports){
+},{"__browserify_Buffer":44}],41:[function(require,module,exports){
 (function(process){var Stream = require('stream')
 
 // through
@@ -6934,326 +7259,7 @@ function through (write, end, opts) {
 
 
 })(require("__browserify_process"))
-},{"stream":45,"__browserify_process":33}],37:[function(require,module,exports){
-
-/**
- * Object#toString() ref for stringify().
- */
-
-var toString = Object.prototype.toString;
-
-/**
- * Array#indexOf shim.
- */
-
-var indexOf = typeof Array.prototype.indexOf === 'function'
-  ? function(arr, el) { return arr.indexOf(el); }
-  : function(arr, el) {
-      for (var i = 0; i < arr.length; i++) {
-        if (arr[i] === el) return i;
-      }
-      return -1;
-    };
-
-/**
- * Array.isArray shim.
- */
-
-var isArray = Array.isArray || function(arr) {
-  return toString.call(arr) == '[object Array]';
-};
-
-/**
- * Object.keys shim.
- */
-
-var objectKeys = Object.keys || function(obj) {
-  var ret = [];
-  for (var key in obj) ret.push(key);
-  return ret;
-};
-
-/**
- * Array#forEach shim.
- */
-
-var forEach = typeof Array.prototype.forEach === 'function'
-  ? function(arr, fn) { return arr.forEach(fn); }
-  : function(arr, fn) {
-      for (var i = 0; i < arr.length; i++) fn(arr[i]);
-    };
-
-/**
- * Array#reduce shim.
- */
-
-var reduce = function(arr, fn, initial) {
-  if (typeof arr.reduce === 'function') return arr.reduce(fn, initial);
-  var res = initial;
-  for (var i = 0; i < arr.length; i++) res = fn(res, arr[i]);
-  return res;
-};
-
-/**
- * Cache non-integer test regexp.
- */
-
-var isint = /^[0-9]+$/;
-
-function promote(parent, key) {
-  if (parent[key].length == 0) return parent[key] = {};
-  var t = {};
-  for (var i in parent[key]) t[i] = parent[key][i];
-  parent[key] = t;
-  return t;
-}
-
-function parse(parts, parent, key, val) {
-  var part = parts.shift();
-  // end
-  if (!part) {
-    if (isArray(parent[key])) {
-      parent[key].push(val);
-    } else if ('object' == typeof parent[key]) {
-      parent[key] = val;
-    } else if ('undefined' == typeof parent[key]) {
-      parent[key] = val;
-    } else {
-      parent[key] = [parent[key], val];
-    }
-    // array
-  } else {
-    var obj = parent[key] = parent[key] || [];
-    if (']' == part) {
-      if (isArray(obj)) {
-        if ('' != val) obj.push(val);
-      } else if ('object' == typeof obj) {
-        obj[objectKeys(obj).length] = val;
-      } else {
-        obj = parent[key] = [parent[key], val];
-      }
-      // prop
-    } else if (~indexOf(part, ']')) {
-      part = part.substr(0, part.length - 1);
-      if (!isint.test(part) && isArray(obj)) obj = promote(parent, key);
-      parse(parts, obj, part, val);
-      // key
-    } else {
-      if (!isint.test(part) && isArray(obj)) obj = promote(parent, key);
-      parse(parts, obj, part, val);
-    }
-  }
-}
-
-/**
- * Merge parent key/val pair.
- */
-
-function merge(parent, key, val){
-  if (~indexOf(key, ']')) {
-    var parts = key.split('[')
-      , len = parts.length
-      , last = len - 1;
-    parse(parts, parent, 'base', val);
-    // optimize
-  } else {
-    if (!isint.test(key) && isArray(parent.base)) {
-      var t = {};
-      for (var k in parent.base) t[k] = parent.base[k];
-      parent.base = t;
-    }
-    set(parent.base, key, val);
-  }
-
-  return parent;
-}
-
-/**
- * Parse the given obj.
- */
-
-function parseObject(obj){
-  var ret = { base: {} };
-  forEach(objectKeys(obj), function(name){
-    merge(ret, name, obj[name]);
-  });
-  return ret.base;
-}
-
-/**
- * Parse the given str.
- */
-
-function parseString(str){
-  return reduce(String(str).split('&'), function(ret, pair){
-    var eql = indexOf(pair, '=')
-      , brace = lastBraceInKey(pair)
-      , key = pair.substr(0, brace || eql)
-      , val = pair.substr(brace || eql, pair.length)
-      , val = val.substr(indexOf(val, '=') + 1, val.length);
-
-    // ?foo
-    if ('' == key) key = pair, val = '';
-    if ('' == key) return ret;
-
-    return merge(ret, decode(key), decode(val));
-  }, { base: {} }).base;
-}
-
-/**
- * Parse the given query `str` or `obj`, returning an object.
- *
- * @param {String} str | {Object} obj
- * @return {Object}
- * @api public
- */
-
-exports.parse = function(str){
-  if (null == str || '' == str) return {};
-  return 'object' == typeof str
-    ? parseObject(str)
-    : parseString(str);
-};
-
-/**
- * Turn the given `obj` into a query string
- *
- * @param {Object} obj
- * @return {String}
- * @api public
- */
-
-var stringify = exports.stringify = function(obj, prefix) {
-  if (isArray(obj)) {
-    return stringifyArray(obj, prefix);
-  } else if ('[object Object]' == toString.call(obj)) {
-    return stringifyObject(obj, prefix);
-  } else if ('string' == typeof obj) {
-    return stringifyString(obj, prefix);
-  } else {
-    return prefix + '=' + encodeURIComponent(String(obj));
-  }
-};
-
-/**
- * Stringify the given `str`.
- *
- * @param {String} str
- * @param {String} prefix
- * @return {String}
- * @api private
- */
-
-function stringifyString(str, prefix) {
-  if (!prefix) throw new TypeError('stringify expects an object');
-  return prefix + '=' + encodeURIComponent(str);
-}
-
-/**
- * Stringify the given `arr`.
- *
- * @param {Array} arr
- * @param {String} prefix
- * @return {String}
- * @api private
- */
-
-function stringifyArray(arr, prefix) {
-  var ret = [];
-  if (!prefix) throw new TypeError('stringify expects an object');
-  for (var i = 0; i < arr.length; i++) {
-    ret.push(stringify(arr[i], prefix + '[' + i + ']'));
-  }
-  return ret.join('&');
-}
-
-/**
- * Stringify the given `obj`.
- *
- * @param {Object} obj
- * @param {String} prefix
- * @return {String}
- * @api private
- */
-
-function stringifyObject(obj, prefix) {
-  var ret = []
-    , keys = objectKeys(obj)
-    , key;
-
-  for (var i = 0, len = keys.length; i < len; ++i) {
-    key = keys[i];
-    if (null == obj[key]) {
-      ret.push(encodeURIComponent(key) + '=');
-    } else {
-      ret.push(stringify(obj[key], prefix
-        ? prefix + '[' + encodeURIComponent(key) + ']'
-        : encodeURIComponent(key)));
-    }
-  }
-
-  return ret.join('&');
-}
-
-/**
- * Set `obj`'s `key` to `val` respecting
- * the weird and wonderful syntax of a qs,
- * where "foo=bar&foo=baz" becomes an array.
- *
- * @param {Object} obj
- * @param {String} key
- * @param {String} val
- * @api private
- */
-
-function set(obj, key, val) {
-  var v = obj[key];
-  if (undefined === v) {
-    obj[key] = val;
-  } else if (isArray(v)) {
-    v.push(val);
-  } else {
-    obj[key] = [v, val];
-  }
-}
-
-/**
- * Locate last brace in `str` within the key.
- *
- * @param {String} str
- * @return {Number}
- * @api private
- */
-
-function lastBraceInKey(str) {
-  var len = str.length
-    , brace
-    , c;
-  for (var i = 0; i < len; ++i) {
-    c = str[i];
-    if (']' == c) brace = false;
-    if ('[' == c) brace = true;
-    if ('=' == c && !brace) return i;
-  }
-}
-
-/**
- * Decode `str`.
- *
- * @param {String} str
- * @return {String}
- * @api private
- */
-
-function decode(str) {
-  try {
-    return decodeURIComponent(str.replace(/\+/g, ' '));
-  } catch (err) {
-    return str;
-  }
-}
-
-},{}],46:[function(require,module,exports){
+},{"stream":45,"__browserify_process":33}],46:[function(require,module,exports){
 (function(process){if (!process.EventEmitter) process.EventEmitter = function () {};
 
 var EventEmitter = exports.EventEmitter = process.EventEmitter;
@@ -7439,128 +7445,7 @@ EventEmitter.prototype.listeners = function(type) {
 };
 
 })(require("__browserify_process"))
-},{"__browserify_process":33}],45:[function(require,module,exports){
-var events = require('events');
-var util = require('util');
-
-function Stream() {
-  events.EventEmitter.call(this);
-}
-util.inherits(Stream, events.EventEmitter);
-module.exports = Stream;
-// Backwards-compat with node 0.4.x
-Stream.Stream = Stream;
-
-Stream.prototype.pipe = function(dest, options) {
-  var source = this;
-
-  function ondata(chunk) {
-    if (dest.writable) {
-      if (false === dest.write(chunk) && source.pause) {
-        source.pause();
-      }
-    }
-  }
-
-  source.on('data', ondata);
-
-  function ondrain() {
-    if (source.readable && source.resume) {
-      source.resume();
-    }
-  }
-
-  dest.on('drain', ondrain);
-
-  // If the 'end' option is not supplied, dest.end() will be called when
-  // source gets the 'end' or 'close' events.  Only dest.end() once, and
-  // only when all sources have ended.
-  if (!dest._isStdio && (!options || options.end !== false)) {
-    dest._pipeCount = dest._pipeCount || 0;
-    dest._pipeCount++;
-
-    source.on('end', onend);
-    source.on('close', onclose);
-  }
-
-  var didOnEnd = false;
-  function onend() {
-    if (didOnEnd) return;
-    didOnEnd = true;
-
-    dest._pipeCount--;
-
-    // remove the listeners
-    cleanup();
-
-    if (dest._pipeCount > 0) {
-      // waiting for other incoming streams to end.
-      return;
-    }
-
-    dest.end();
-  }
-
-
-  function onclose() {
-    if (didOnEnd) return;
-    didOnEnd = true;
-
-    dest._pipeCount--;
-
-    // remove the listeners
-    cleanup();
-
-    if (dest._pipeCount > 0) {
-      // waiting for other incoming streams to end.
-      return;
-    }
-
-    dest.destroy();
-  }
-
-  // don't leave dangling pipes when there are errors.
-  function onerror(er) {
-    cleanup();
-    if (this.listeners('error').length === 0) {
-      throw er; // Unhandled stream error in pipe.
-    }
-  }
-
-  source.on('error', onerror);
-  dest.on('error', onerror);
-
-  // remove all the event listeners that were added.
-  function cleanup() {
-    source.removeListener('data', ondata);
-    dest.removeListener('drain', ondrain);
-
-    source.removeListener('end', onend);
-    source.removeListener('close', onclose);
-
-    source.removeListener('error', onerror);
-    dest.removeListener('error', onerror);
-
-    source.removeListener('end', cleanup);
-    source.removeListener('close', cleanup);
-
-    dest.removeListener('end', cleanup);
-    dest.removeListener('close', cleanup);
-  }
-
-  source.on('end', cleanup);
-  source.on('close', cleanup);
-
-  dest.on('end', cleanup);
-  dest.on('close', cleanup);
-
-  dest.emit('pipe', source);
-
-  // Allow for unix-like usage: A.pipe(B).pipe(C)
-  return dest;
-};
-
-},{"events":46,"util":47}],47:[function(require,module,exports){
+},{"__browserify_process":33}],47:[function(require,module,exports){
 var events = require('events');
 
 exports.isArray = isArray;
@@ -7913,7 +7798,128 @@ exports.format = function(f) {
   return str;
 };
 
-},{"events":46}],48:[function(require,module,exports){
+},{"events":46}],45:[function(require,module,exports){
+var events = require('events');
+var util = require('util');
+
+function Stream() {
+  events.EventEmitter.call(this);
+}
+util.inherits(Stream, events.EventEmitter);
+module.exports = Stream;
+// Backwards-compat with node 0.4.x
+Stream.Stream = Stream;
+
+Stream.prototype.pipe = function(dest, options) {
+  var source = this;
+
+  function ondata(chunk) {
+    if (dest.writable) {
+      if (false === dest.write(chunk) && source.pause) {
+        source.pause();
+      }
+    }
+  }
+
+  source.on('data', ondata);
+
+  function ondrain() {
+    if (source.readable && source.resume) {
+      source.resume();
+    }
+  }
+
+  dest.on('drain', ondrain);
+
+  // If the 'end' option is not supplied, dest.end() will be called when
+  // source gets the 'end' or 'close' events.  Only dest.end() once, and
+  // only when all sources have ended.
+  if (!dest._isStdio && (!options || options.end !== false)) {
+    dest._pipeCount = dest._pipeCount || 0;
+    dest._pipeCount++;
+
+    source.on('end', onend);
+    source.on('close', onclose);
+  }
+
+  var didOnEnd = false;
+  function onend() {
+    if (didOnEnd) return;
+    didOnEnd = true;
+
+    dest._pipeCount--;
+
+    // remove the listeners
+    cleanup();
+
+    if (dest._pipeCount > 0) {
+      // waiting for other incoming streams to end.
+      return;
+    }
+
+    dest.end();
+  }
+
+
+  function onclose() {
+    if (didOnEnd) return;
+    didOnEnd = true;
+
+    dest._pipeCount--;
+
+    // remove the listeners
+    cleanup();
+
+    if (dest._pipeCount > 0) {
+      // waiting for other incoming streams to end.
+      return;
+    }
+
+    dest.destroy();
+  }
+
+  // don't leave dangling pipes when there are errors.
+  function onerror(er) {
+    cleanup();
+    if (this.listeners('error').length === 0) {
+      throw er; // Unhandled stream error in pipe.
+    }
+  }
+
+  source.on('error', onerror);
+  dest.on('error', onerror);
+
+  // remove all the event listeners that were added.
+  function cleanup() {
+    source.removeListener('data', ondata);
+    dest.removeListener('drain', ondrain);
+
+    source.removeListener('end', onend);
+    source.removeListener('close', onclose);
+
+    source.removeListener('error', onerror);
+    dest.removeListener('error', onerror);
+
+    source.removeListener('end', cleanup);
+    source.removeListener('close', cleanup);
+
+    dest.removeListener('end', cleanup);
+    dest.removeListener('close', cleanup);
+  }
+
+  source.on('end', cleanup);
+  source.on('close', cleanup);
+
+  dest.on('end', cleanup);
+  dest.on('close', cleanup);
+
+  dest.emit('pipe', source);
+
+  // Allow for unix-like usage: A.pipe(B).pipe(C)
+  return dest;
+};
+
+},{"events":46,"util":47}],48:[function(require,module,exports){
 // http://paulirish.com/2011/requestanimationframe-for-smart-animating/
 // http://my.opera.com/emoller/blog/2011/12/20/requestanimationframe-for-smart-er-animating
  
@@ -8016,7 +8022,139 @@ if(typeof window.performance === "object") {
   module.exports = function() { return (new Date()).getTime() }
 }
 
-},{}],35:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
+"use strict";
+
+var weakMap = typeof WeakMap === "undefined" ? require("weakmap") : WeakMap
+
+var WebGLEWStruct = new weakMap()
+
+function baseName(ext_name) {
+  return ext_name.replace(/^[A-Z]+_/, "")
+}
+
+function initWebGLEW(gl) {
+  var struct = WebGLEWStruct.get(gl)
+  if(struct) {
+    return struct
+  }
+  var extensions = {}
+  var supported = gl.getSupportedExtensions()
+  for(var i=0; i<supported.length; ++i) {
+    var extName = supported[i]
+    var ext = gl.getExtension(supported[i])
+    if(!ext) {
+      continue
+    }
+    while(true) {
+      extensions[extName] = ext
+      var base = baseName(extName)
+      if(base === extName) {
+        break
+      }
+      extName = base
+    }
+  }
+  WebGLEWStruct.set(gl, extensions)
+  return extensions
+}
+module.exports = initWebGLEW
+},{"weakmap":51}],36:[function(require,module,exports){
+"use strict"
+
+var glm = require("gl-matrix")
+var vec3 = glm.vec3
+var mat3 = glm.mat3
+var mat4 = glm.mat4
+var quat = glm.quat
+
+//Scratch variables
+var scratch0 = new Float32Array(16)
+var scratch1 = new Float32Array(16)
+
+function OrbitCamera(rotation, center, distance) {
+  this.rotation = rotation
+  this.center   = center
+  this.distance = distance
+}
+
+var proto = OrbitCamera.prototype
+
+proto.view = function(out) {
+  if(!out) {
+    out = mat4.create()
+  }
+  scratch1[0] = scratch1[1] = 0.0
+  scratch1[2] = -this.distance
+  mat4.fromRotationTranslation(out,
+    quat.conjugate(scratch0, this.rotation),
+    scratch1)
+  mat4.translate(out, out, vec3.negate(scratch0, this.center))
+  return out
+}
+
+proto.lookAt = function(eye, center, up) {
+  mat4.lookAt(scratch0, eye, center, up)
+  mat3.fromMat4(scratch0, scratch0)
+  quat.fromMat3(this.rotation, scratch0)
+  vec3.copy(this.center, center)
+  this.distance = vec3.distance(eye, center)
+}
+
+proto.pan = function(dpan) {
+  var d = this.distance
+  scratch0[0] = -d*(dpan[0]||0)
+  scratch0[1] =  d*(dpan[1]||0)
+  scratch0[2] =  d*(dpan[2]||0)
+  vec3.transformQuat(scratch0, scratch0, this.rotation)
+  vec3.add(this.center, this.center, scratch0)
+}
+
+proto.zoom = function(d) {
+  this.distance += d
+  if(this.distance < 0.0) {
+    this.distance = 0.0
+  }
+}
+
+function quatFromVec(out, da) {
+  var x = da[0]
+  var y = da[1]
+  var z = da[2]
+  var s = x*x + y*y
+  if(s > 1.0) {
+    s = 1.0
+  }
+  out[0] = -da[0]
+  out[1] =  da[1]
+  out[2] =  da[2] || Math.sqrt(1.0 - s)
+  out[3] =  0.0
+}
+
+proto.rotate = function(da, db) {
+  quatFromVec(scratch0, da)
+  quatFromVec(scratch1, db)
+  quat.invert(scratch1, scratch1)
+  quat.multiply(scratch0, scratch0, scratch1)
+  if(quat.length(scratch0) < 1e-6) {
+    return
+  }
+  quat.multiply(this.rotation, this.rotation, scratch0)
+  quat.normalize(this.rotation, this.rotation)
+}
+
+function createOrbitCamera(eye, target, up) {
+  eye     = eye     || [0,0,-1]
+  target  = target  || [0,0,0]
+  up      = up      || [0,1,0]
+  var camera = new OrbitCamera(quat.create(), vec3.create(), 1.0)
+  camera.lookAt(eye, target, up)
+  return camera
+}
+
+module.exports = createOrbitCamera
+
+},{"gl-matrix":52}],38:[function(require,module,exports){
 "use strict"
 
 var EventEmitter = require("events").EventEmitter
@@ -8736,455 +8874,7 @@ function createShell(options) {
 
 module.exports = createShell
 
-},{"events":46,"util":47,"./lib/raf-polyfill.js":48,"./lib/mousewheel-polyfill.js":49,"./lib/hrtime-polyfill.js":50,"vkey":51,"domready":52,"uniq":53,"invert-hash":54,"binary-search-bounds":55,"iota-array":56}],36:[function(require,module,exports){
-"use strict";
-
-var weakMap = typeof WeakMap === "undefined" ? require("weakmap") : WeakMap
-
-var WebGLEWStruct = new weakMap()
-
-function baseName(ext_name) {
-  return ext_name.replace(/^[A-Z]+_/, "")
-}
-
-function initWebGLEW(gl) {
-  var struct = WebGLEWStruct.get(gl)
-  if(struct) {
-    return struct
-  }
-  var extensions = {}
-  var supported = gl.getSupportedExtensions()
-  for(var i=0; i<supported.length; ++i) {
-    var extName = supported[i]
-    var ext = gl.getExtension(supported[i])
-    if(!ext) {
-      continue
-    }
-    while(true) {
-      extensions[extName] = ext
-      var base = baseName(extName)
-      if(base === extName) {
-        break
-      }
-      extName = base
-    }
-  }
-  WebGLEWStruct.set(gl, extensions)
-  return extensions
-}
-module.exports = initWebGLEW
-},{"weakmap":57}],38:[function(require,module,exports){
-"use strict"
-
-var glm = require("gl-matrix")
-var vec3 = glm.vec3
-var mat3 = glm.mat3
-var mat4 = glm.mat4
-var quat = glm.quat
-
-//Scratch variables
-var scratch0 = new Float32Array(16)
-var scratch1 = new Float32Array(16)
-
-function OrbitCamera(rotation, center, distance) {
-  this.rotation = rotation
-  this.center   = center
-  this.distance = distance
-}
-
-var proto = OrbitCamera.prototype
-
-proto.view = function(out) {
-  if(!out) {
-    out = mat4.create()
-  }
-  scratch1[0] = scratch1[1] = 0.0
-  scratch1[2] = -this.distance
-  mat4.fromRotationTranslation(out,
-    quat.conjugate(scratch0, this.rotation),
-    scratch1)
-  mat4.translate(out, out, vec3.negate(scratch0, this.center))
-  return out
-}
-
-proto.lookAt = function(eye, center, up) {
-  mat4.lookAt(scratch0, eye, center, up)
-  mat3.fromMat4(scratch0, scratch0)
-  quat.fromMat3(this.rotation, scratch0)
-  vec3.copy(this.center, center)
-  this.distance = vec3.distance(eye, center)
-}
-
-proto.pan = function(dpan) {
-  var d = this.distance
-  scratch0[0] = -d*(dpan[0]||0)
-  scratch0[1] =  d*(dpan[1]||0)
-  scratch0[2] =  d*(dpan[2]||0)
-  vec3.transformQuat(scratch0, scratch0, this.rotation)
-  vec3.add(this.center, this.center, scratch0)
-}
-
-proto.zoom = function(d) {
-  this.distance += d
-  if(this.distance < 0.0) {
-    this.distance = 0.0
-  }
-}
-
-function quatFromVec(out, da) {
-  var x = da[0]
-  var y = da[1]
-  var z = da[2]
-  var s = x*x + y*y
-  if(s > 1.0) {
-    s = 1.0
-  }
-  out[0] = -da[0]
-  out[1] =  da[1]
-  out[2] =  da[2] || Math.sqrt(1.0 - s)
-  out[3] =  0.0
-}
-
-proto.rotate = function(da, db) {
-  quatFromVec(scratch0, da)
-  quatFromVec(scratch1, db)
-  quat.invert(scratch1, scratch1)
-  quat.multiply(scratch0, scratch0, scratch1)
-  if(quat.length(scratch0) < 1e-6) {
-    return
-  }
-  quat.multiply(this.rotation, this.rotation, scratch0)
-  quat.normalize(this.rotation, this.rotation)
-}
-
-function createOrbitCamera(eye, target, up) {
-  eye     = eye     || [0,0,-1]
-  target  = target  || [0,0,0]
-  up      = up      || [0,1,0]
-  var camera = new OrbitCamera(quat.create(), vec3.create(), 1.0)
-  camera.lookAt(eye, target, up)
-  return camera
-}
-
-module.exports = createOrbitCamera
-
-},{"gl-matrix":58}],51:[function(require,module,exports){
-(function(){var ua = typeof window !== 'undefined' ? window.navigator.userAgent : ''
-  , isOSX = /OS X/.test(ua)
-  , isOpera = /Opera/.test(ua)
-  , maybeFirefox = !/like Gecko/.test(ua) && !isOpera
-
-var i, output = module.exports = {
-  0:  isOSX ? '<menu>' : '<UNK>'
-, 1:  '<mouse 1>'
-, 2:  '<mouse 2>'
-, 3:  '<break>'
-, 4:  '<mouse 3>'
-, 5:  '<mouse 4>'
-, 6:  '<mouse 5>'
-, 8:  '<backspace>'
-, 9:  '<tab>'
-, 12: '<clear>'
-, 13: '<enter>'
-, 16: '<shift>'
-, 17: '<control>'
-, 18: '<alt>'
-, 19: '<pause>'
-, 20: '<caps-lock>'
-, 21: '<ime-hangul>'
-, 23: '<ime-junja>'
-, 24: '<ime-final>'
-, 25: '<ime-kanji>'
-, 27: '<escape>'
-, 28: '<ime-convert>'
-, 29: '<ime-nonconvert>'
-, 30: '<ime-accept>'
-, 31: '<ime-mode-change>'
-, 27: '<escape>'
-, 32: '<space>'
-, 33: '<page-up>'
-, 34: '<page-down>'
-, 35: '<end>'
-, 36: '<home>'
-, 37: '<left>'
-, 38: '<up>'
-, 39: '<right>'
-, 40: '<down>'
-, 41: '<select>'
-, 42: '<print>'
-, 43: '<execute>'
-, 44: '<snapshot>'
-, 45: '<insert>'
-, 46: '<delete>'
-, 47: '<help>'
-, 91: '<meta>'  // meta-left -- no one handles left and right properly, so we coerce into one.
-, 92: '<meta>'  // meta-right
-, 93: isOSX ? '<meta>' : '<menu>'      // chrome,opera,safari all report this for meta-right (osx mbp).
-, 95: '<sleep>'
-, 106: '<num-*>'
-, 107: '<num-+>'
-, 108: '<num-enter>'
-, 109: '<num-->'
-, 110: '<num-.>'
-, 111: '<num-/>'
-, 144: '<num-lock>'
-, 145: '<scroll-lock>'
-, 160: '<shift-left>'
-, 161: '<shift-right>'
-, 162: '<control-left>'
-, 163: '<control-right>'
-, 164: '<alt-left>'
-, 165: '<alt-right>'
-, 166: '<browser-back>'
-, 167: '<browser-forward>'
-, 168: '<browser-refresh>'
-, 169: '<browser-stop>'
-, 170: '<browser-search>'
-, 171: '<browser-favorites>'
-, 172: '<browser-home>'
-
-  // ff/osx reports '<volume-mute>' for '-'
-, 173: isOSX && maybeFirefox ? '-' : '<volume-mute>'
-, 174: '<volume-down>'
-, 175: '<volume-up>'
-, 176: '<next-track>'
-, 177: '<prev-track>'
-, 178: '<stop>'
-, 179: '<play-pause>'
-, 180: '<launch-mail>'
-, 181: '<launch-media-select>'
-, 182: '<launch-app 1>'
-, 183: '<launch-app 2>'
-, 186: ';'
-, 187: '='
-, 188: ','
-, 189: '-'
-, 190: '.'
-, 191: '/'
-, 192: '`'
-, 219: '['
-, 220: '\\'
-, 221: ']'
-, 222: "'"
-, 223: '<meta>'
-, 224: '<meta>'       // firefox reports meta here.
-, 226: '<alt-gr>'
-, 229: '<ime-process>'
-, 231: isOpera ? '`' : '<unicode>'
-, 246: '<attention>'
-, 247: '<crsel>'
-, 248: '<exsel>'
-, 249: '<erase-eof>'
-, 250: '<play>'
-, 251: '<zoom>'
-, 252: '<no-name>'
-, 253: '<pa-1>'
-, 254: '<clear>'
-}
-
-for(i = 58; i < 65; ++i) {
-  output[i] = String.fromCharCode(i)
-}
-
-// 0-9
-for(i = 48; i < 58; ++i) {
-  output[i] = (i - 48)+''
-}
-
-// A-Z
-for(i = 65; i < 91; ++i) {
-  output[i] = String.fromCharCode(i)
-}
-
-// num0-9
-for(i = 96; i < 106; ++i) {
-  output[i] = '<num-'+(i - 96)+'>'
-}
-
-// F1-F24
-for(i = 112; i < 136; ++i) {
-  output[i] = 'F'+(i-111)
-}
-
-})()
-},{}],52:[function(require,module,exports){
-/*!
-  * domready (c) Dustin Diaz 2014 - License MIT
-  */
-!function (name, definition) {
-
-  if (typeof module != 'undefined') module.exports = definition()
-  else if (typeof define == 'function' && typeof define.amd == 'object') define(definition)
-  else this[name] = definition()
-
-}('domready', function () {
-
-  var fns = [], listener
-    , doc = document
-    , domContentLoaded = 'DOMContentLoaded'
-    , loaded = /^loaded|^c/.test(doc.readyState)
-
-  if (!loaded)
-  doc.addEventListener(domContentLoaded, listener = function () {
-    doc.removeEventListener(domContentLoaded, listener)
-    loaded = 1
-    while (listener = fns.shift()) listener()
-  })
-
-  return function (fn) {
-    loaded ? fn() : fns.push(fn)
-  }
-
-});
-
-},{}],53:[function(require,module,exports){
-"use strict"
-
-function unique_pred(list, compare) {
-  var ptr = 1
-    , len = list.length
-    , a=list[0], b=list[0]
-  for(var i=1; i<len; ++i) {
-    b = a
-    a = list[i]
-    if(compare(a, b)) {
-      if(i === ptr) {
-        ptr++
-        continue
-      }
-      list[ptr++] = a
-    }
-  }
-  list.length = ptr
-  return list
-}
-
-function unique_eq(list) {
-  var ptr = 1
-    , len = list.length
-    , a=list[0], b = list[0]
-  for(var i=1; i<len; ++i, b=a) {
-    b = a
-    a = list[i]
-    if(a !== b) {
-      if(i === ptr) {
-        ptr++
-        continue
-      }
-      list[ptr++] = a
-    }
-  }
-  list.length = ptr
-  return list
-}
-
-function unique(list, compare, sorted) {
-  if(list.length === 0) {
-    return list
-  }
-  if(compare) {
-    if(!sorted) {
-      list.sort(compare)
-    }
-    return unique_pred(list, compare)
-  }
-  if(!sorted) {
-    list.sort()
-  }
-  return unique_eq(list)
-}
-
-module.exports = unique
-
-},{}],54:[function(require,module,exports){
-"use strict"
-
-function invert(hash) {
-  var result = {}
-  for(var i in hash) {
-    if(hash.hasOwnProperty(i)) {
-      result[hash[i]] = i
-    }
-  }
-  return result
-}
-
-module.exports = invert
-},{}],55:[function(require,module,exports){
-"use strict"
-
-function compileSearch(funcName, predicate, reversed, extraArgs, useNdarray, earlyOut) {
-  var code = [
-    "function ", funcName, "(a,l,h,", extraArgs.join(","),  "){",
-earlyOut ? "" : "var i=", (reversed ? "l-1" : "h+1"),
-";while(l<=h){\
-var m=(l+h)>>>1,x=a", useNdarray ? ".get(m)" : "[m]"]
-  if(earlyOut) {
-    if(predicate.indexOf("c") < 0) {
-      code.push(";if(x===y){return m}else if(x<=y){")
-    } else {
-      code.push(";var p=c(x,y);if(p===0){return m}else if(p<=0){")
-    }
-  } else {
-    code.push(";if(", predicate, "){i=m;")
-  }
-  if(reversed) {
-    code.push("l=m+1}else{h=m-1}")
-  } else {
-    code.push("h=m-1}else{l=m+1}")
-  }
-  code.push("}")
-  if(earlyOut) {
-    code.push("return -1};")
-  } else {
-    code.push("return i};")
-  }
-  return code.join("")
-}
-
-function compileBoundsSearch(predicate, reversed, suffix, earlyOut) {
-  var result = new Function([
-  compileSearch("A", "x" + predicate + "y", reversed, ["y"], false, earlyOut),
-  compileSearch("B", "x" + predicate + "y", reversed, ["y"], true, earlyOut),
-  compileSearch("P", "c(x,y)" + predicate + "0", reversed, ["y", "c"], false, earlyOut),
-  compileSearch("Q", "c(x,y)" + predicate + "0", reversed, ["y", "c"], true, earlyOut),
-"function dispatchBsearch", suffix, "(a,y,c,l,h){\
-if(a.shape){\
-if(typeof(c)==='function'){\
-return Q(a,(l===undefined)?0:l|0,(h===undefined)?a.shape[0]-1:h|0,y,c)\
-}else{\
-return B(a,(c===undefined)?0:c|0,(l===undefined)?a.shape[0]-1:l|0,y)\
-}}else{\
-if(typeof(c)==='function'){\
-return P(a,(l===undefined)?0:l|0,(h===undefined)?a.length-1:h|0,y,c)\
-}else{\
-return A(a,(c===undefined)?0:c|0,(l===undefined)?a.length-1:l|0,y)\
-}}}\
-return dispatchBsearch", suffix].join(""))
-  return result()
-}
-
-module.exports = {
-  ge: compileBoundsSearch(">=", false, "GE"),
-  gt: compileBoundsSearch(">", false, "GT"),
-  lt: compileBoundsSearch("<", true, "LT"),
-  le: compileBoundsSearch("<=", true, "LE"),
-  eq: compileBoundsSearch("-", true, "EQ", true)
-}
-
-},{}],56:[function(require,module,exports){
-"use strict"
-
-function iota(n) {
-  var result = new Array(n)
-  for(var i=0; i<n; ++i) {
-    result[i] = i
-  }
-  return result
-}
-
-module.exports = iota
-},{}],57:[function(require,module,exports){
+},{"events":46,"util":47,"./lib/raf-polyfill.js":48,"./lib/mousewheel-polyfill.js":49,"./lib/hrtime-polyfill.js":50,"domready":53,"vkey":54,"invert-hash":55,"uniq":56,"iota-array":57,"binary-search-bounds":58}],51:[function(require,module,exports){
 (function(){/* (The MIT License)
  *
  * Copyright (c) 2012 Brandon Benvie <http://bbenvie.com>
@@ -9427,7 +9117,7 @@ void function(global, undefined_, undefined){
 }((0, eval)('this'));
 
 })()
-},{}],58:[function(require,module,exports){
+},{}],52:[function(require,module,exports){
 (function(){/**
  * @fileoverview gl-matrix - High performance matrix and vector operations
  * @author Brandon Jones
@@ -13678,7 +13368,323 @@ if(typeof(exports) !== 'undefined') {
 })(this);
 
 })()
-},{}],44:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
+(function(){var ua = typeof window !== 'undefined' ? window.navigator.userAgent : ''
+  , isOSX = /OS X/.test(ua)
+  , isOpera = /Opera/.test(ua)
+  , maybeFirefox = !/like Gecko/.test(ua) && !isOpera
+
+var i, output = module.exports = {
+  0:  isOSX ? '<menu>' : '<UNK>'
+, 1:  '<mouse 1>'
+, 2:  '<mouse 2>'
+, 3:  '<break>'
+, 4:  '<mouse 3>'
+, 5:  '<mouse 4>'
+, 6:  '<mouse 5>'
+, 8:  '<backspace>'
+, 9:  '<tab>'
+, 12: '<clear>'
+, 13: '<enter>'
+, 16: '<shift>'
+, 17: '<control>'
+, 18: '<alt>'
+, 19: '<pause>'
+, 20: '<caps-lock>'
+, 21: '<ime-hangul>'
+, 23: '<ime-junja>'
+, 24: '<ime-final>'
+, 25: '<ime-kanji>'
+, 27: '<escape>'
+, 28: '<ime-convert>'
+, 29: '<ime-nonconvert>'
+, 30: '<ime-accept>'
+, 31: '<ime-mode-change>'
+, 27: '<escape>'
+, 32: '<space>'
+, 33: '<page-up>'
+, 34: '<page-down>'
+, 35: '<end>'
+, 36: '<home>'
+, 37: '<left>'
+, 38: '<up>'
+, 39: '<right>'
+, 40: '<down>'
+, 41: '<select>'
+, 42: '<print>'
+, 43: '<execute>'
+, 44: '<snapshot>'
+, 45: '<insert>'
+, 46: '<delete>'
+, 47: '<help>'
+, 91: '<meta>'  // meta-left -- no one handles left and right properly, so we coerce into one.
+, 92: '<meta>'  // meta-right
+, 93: isOSX ? '<meta>' : '<menu>'      // chrome,opera,safari all report this for meta-right (osx mbp).
+, 95: '<sleep>'
+, 106: '<num-*>'
+, 107: '<num-+>'
+, 108: '<num-enter>'
+, 109: '<num-->'
+, 110: '<num-.>'
+, 111: '<num-/>'
+, 144: '<num-lock>'
+, 145: '<scroll-lock>'
+, 160: '<shift-left>'
+, 161: '<shift-right>'
+, 162: '<control-left>'
+, 163: '<control-right>'
+, 164: '<alt-left>'
+, 165: '<alt-right>'
+, 166: '<browser-back>'
+, 167: '<browser-forward>'
+, 168: '<browser-refresh>'
+, 169: '<browser-stop>'
+, 170: '<browser-search>'
+, 171: '<browser-favorites>'
+, 172: '<browser-home>'
+
+  // ff/osx reports '<volume-mute>' for '-'
+, 173: isOSX && maybeFirefox ? '-' : '<volume-mute>'
+, 174: '<volume-down>'
+, 175: '<volume-up>'
+, 176: '<next-track>'
+, 177: '<prev-track>'
+, 178: '<stop>'
+, 179: '<play-pause>'
+, 180: '<launch-mail>'
+, 181: '<launch-media-select>'
+, 182: '<launch-app 1>'
+, 183: '<launch-app 2>'
+, 186: ';'
+, 187: '='
+, 188: ','
+, 189: '-'
+, 190: '.'
+, 191: '/'
+, 192: '`'
+, 219: '['
+, 220: '\\'
+, 221: ']'
+, 222: "'"
+, 223: '<meta>'
+, 224: '<meta>'       // firefox reports meta here.
+, 226: '<alt-gr>'
+, 229: '<ime-process>'
+, 231: isOpera ? '`' : '<unicode>'
+, 246: '<attention>'
+, 247: '<crsel>'
+, 248: '<exsel>'
+, 249: '<erase-eof>'
+, 250: '<play>'
+, 251: '<zoom>'
+, 252: '<no-name>'
+, 253: '<pa-1>'
+, 254: '<clear>'
+}
+
+for(i = 58; i < 65; ++i) {
+  output[i] = String.fromCharCode(i)
+}
+
+// 0-9
+for(i = 48; i < 58; ++i) {
+  output[i] = (i - 48)+''
+}
+
+// A-Z
+for(i = 65; i < 91; ++i) {
+  output[i] = String.fromCharCode(i)
+}
+
+// num0-9
+for(i = 96; i < 106; ++i) {
+  output[i] = '<num-'+(i - 96)+'>'
+}
+
+// F1-F24
+for(i = 112; i < 136; ++i) {
+  output[i] = 'F'+(i-111)
+}
+
+})()
+},{}],53:[function(require,module,exports){
+/*!
+  * domready (c) Dustin Diaz 2014 - License MIT
+  */
+!function (name, definition) {
+
+  if (typeof module != 'undefined') module.exports = definition()
+  else if (typeof define == 'function' && typeof define.amd == 'object') define(definition)
+  else this[name] = definition()
+
+}('domready', function () {
+
+  var fns = [], listener
+    , doc = document
+    , domContentLoaded = 'DOMContentLoaded'
+    , loaded = /^loaded|^c/.test(doc.readyState)
+
+  if (!loaded)
+  doc.addEventListener(domContentLoaded, listener = function () {
+    doc.removeEventListener(domContentLoaded, listener)
+    loaded = 1
+    while (listener = fns.shift()) listener()
+  })
+
+  return function (fn) {
+    loaded ? fn() : fns.push(fn)
+  }
+
+});
+
+},{}],55:[function(require,module,exports){
+"use strict"
+
+function invert(hash) {
+  var result = {}
+  for(var i in hash) {
+    if(hash.hasOwnProperty(i)) {
+      result[hash[i]] = i
+    }
+  }
+  return result
+}
+
+module.exports = invert
+},{}],57:[function(require,module,exports){
+"use strict"
+
+function iota(n) {
+  var result = new Array(n)
+  for(var i=0; i<n; ++i) {
+    result[i] = i
+  }
+  return result
+}
+
+module.exports = iota
+},{}],56:[function(require,module,exports){
+"use strict"
+
+function unique_pred(list, compare) {
+  var ptr = 1
+    , len = list.length
+    , a=list[0], b=list[0]
+  for(var i=1; i<len; ++i) {
+    b = a
+    a = list[i]
+    if(compare(a, b)) {
+      if(i === ptr) {
+        ptr++
+        continue
+      }
+      list[ptr++] = a
+    }
+  }
+  list.length = ptr
+  return list
+}
+
+function unique_eq(list) {
+  var ptr = 1
+    , len = list.length
+    , a=list[0], b = list[0]
+  for(var i=1; i<len; ++i, b=a) {
+    b = a
+    a = list[i]
+    if(a !== b) {
+      if(i === ptr) {
+        ptr++
+        continue
+      }
+      list[ptr++] = a
+    }
+  }
+  list.length = ptr
+  return list
+}
+
+function unique(list, compare, sorted) {
+  if(list.length === 0) {
+    return list
+  }
+  if(compare) {
+    if(!sorted) {
+      list.sort(compare)
+    }
+    return unique_pred(list, compare)
+  }
+  if(!sorted) {
+    list.sort()
+  }
+  return unique_eq(list)
+}
+
+module.exports = unique
+
+},{}],58:[function(require,module,exports){
+"use strict"
+
+function compileSearch(funcName, predicate, reversed, extraArgs, useNdarray, earlyOut) {
+  var code = [
+    "function ", funcName, "(a,l,h,", extraArgs.join(","),  "){",
+earlyOut ? "" : "var i=", (reversed ? "l-1" : "h+1"),
+";while(l<=h){\
+var m=(l+h)>>>1,x=a", useNdarray ? ".get(m)" : "[m]"]
+  if(earlyOut) {
+    if(predicate.indexOf("c") < 0) {
+      code.push(";if(x===y){return m}else if(x<=y){")
+    } else {
+      code.push(";var p=c(x,y);if(p===0){return m}else if(p<=0){")
+    }
+  } else {
+    code.push(";if(", predicate, "){i=m;")
+  }
+  if(reversed) {
+    code.push("l=m+1}else{h=m-1}")
+  } else {
+    code.push("h=m-1}else{l=m+1}")
+  }
+  code.push("}")
+  if(earlyOut) {
+    code.push("return -1};")
+  } else {
+    code.push("return i};")
+  }
+  return code.join("")
+}
+
+function compileBoundsSearch(predicate, reversed, suffix, earlyOut) {
+  var result = new Function([
+  compileSearch("A", "x" + predicate + "y", reversed, ["y"], false, earlyOut),
+  compileSearch("B", "x" + predicate + "y", reversed, ["y"], true, earlyOut),
+  compileSearch("P", "c(x,y)" + predicate + "0", reversed, ["y", "c"], false, earlyOut),
+  compileSearch("Q", "c(x,y)" + predicate + "0", reversed, ["y", "c"], true, earlyOut),
+"function dispatchBsearch", suffix, "(a,y,c,l,h){\
+if(a.shape){\
+if(typeof(c)==='function'){\
+return Q(a,(l===undefined)?0:l|0,(h===undefined)?a.shape[0]-1:h|0,y,c)\
+}else{\
+return B(a,(c===undefined)?0:c|0,(l===undefined)?a.shape[0]-1:l|0,y)\
+}}else{\
+if(typeof(c)==='function'){\
+return P(a,(l===undefined)?0:l|0,(h===undefined)?a.length-1:h|0,y,c)\
+}else{\
+return A(a,(c===undefined)?0:c|0,(l===undefined)?a.length-1:l|0,y)\
+}}}\
+return dispatchBsearch", suffix].join(""))
+  return result()
+}
+
+module.exports = {
+  ge: compileBoundsSearch(">=", false, "GE"),
+  gt: compileBoundsSearch(">", false, "GT"),
+  lt: compileBoundsSearch("<", true, "LT"),
+  le: compileBoundsSearch("<=", true, "LE"),
+  eq: compileBoundsSearch("-", true, "EQ", true)
+}
+
+},{}],43:[function(require,module,exports){
 (function(Buffer){var iota = require("iota-array")
 
 var arrayMethods = [
@@ -14077,22 +14083,7 @@ function wrappedNDArrayCtor(data, shape, stride, offset) {
 
 module.exports = wrappedNDArrayCtor
 })(require("__browserify_Buffer").Buffer)
-},{"iota-array":59,"__browserify_Buffer":40}],59:[function(require,module,exports){
-"use strict"
-
-function iota(n) {
-  var result = new Array(n)
-  for(var i=0; i<n; ++i) {
-    result[i] = i
-  }
-  return result
-}
-
-module.exports = iota
-},{}],60:[function(require,module,exports){
-module.exports=require('cwise-compiler')({"args":["array","scalar","index"],"pre":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"body":{"body":"{\nvar _inline_1_v=_inline_1_arg1_,_inline_1_i\nfor(_inline_1_i=0;_inline_1_i<_inline_1_arg2_.length-1;++_inline_1_i) {\n_inline_1_v=_inline_1_v[_inline_1_arg2_[_inline_1_i]]\n}\n_inline_1_arg0_=_inline_1_v[_inline_1_arg2_[_inline_1_arg2_.length-1]]\n}","args":[{"name":"_inline_1_arg0_","lvalue":true,"rvalue":false,"count":1},{"name":"_inline_1_arg1_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_1_arg2_","lvalue":false,"rvalue":true,"count":4}],"thisVars":[],"localVars":["_inline_1_i","_inline_1_v"]},"post":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"funcName":"convert","blockSize":64})
-
-},{"cwise-compiler":61}],42:[function(require,module,exports){
+},{"iota-array":59,"__browserify_Buffer":44}],40:[function(require,module,exports){
 "use strict"
 
 var ndarray = require("ndarray")
@@ -14115,7 +14106,22 @@ module.exports = function convert(arr, result) {
   return result
 }
 
-},{"./doConvert.js":60,"ndarray":44}],2:[function(require,module,exports){
+},{"./doConvert.js":60,"ndarray":43}],59:[function(require,module,exports){
+"use strict"
+
+function iota(n) {
+  var result = new Array(n)
+  for(var i=0; i<n; ++i) {
+    result[i] = i
+  }
+  return result
+}
+
+module.exports = iota
+},{}],60:[function(require,module,exports){
+module.exports=require('cwise-compiler')({"args":["array","scalar","index"],"pre":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"body":{"body":"{\nvar _inline_1_v=_inline_1_arg1_,_inline_1_i\nfor(_inline_1_i=0;_inline_1_i<_inline_1_arg2_.length-1;++_inline_1_i) {\n_inline_1_v=_inline_1_v[_inline_1_arg2_[_inline_1_i]]\n}\n_inline_1_arg0_=_inline_1_v[_inline_1_arg2_[_inline_1_arg2_.length-1]]\n}","args":[{"name":"_inline_1_arg0_","lvalue":true,"rvalue":false,"count":1},{"name":"_inline_1_arg1_","lvalue":false,"rvalue":true,"count":1},{"name":"_inline_1_arg2_","lvalue":false,"rvalue":true,"count":4}],"thisVars":[],"localVars":["_inline_1_i","_inline_1_v"]},"post":{"body":"{}","args":[],"thisVars":[],"localVars":[]},"funcName":"convert","blockSize":64})
+
+},{"cwise-compiler":61}],2:[function(require,module,exports){
 "use strict";
 var bits = require("bit-twiddle");
 var glslify = require("glslify");
@@ -14330,7 +14336,17 @@ function createVolumeRenderer(gl, array) {
     shader.attributes.position.location = 0;
     return new VolumeRenderer(gl, vao, vertBuf, shader, texture, [array.shape[2] + 2, array.shape[1] + 2, array.shape[0]], [zsplit[1], zsplit[0]], [gridW, gridH]);
 }
-},{"glslify/adapter.js":62,"cwise/lib/wrapper":63,"bit-twiddle":64,"gl-texture2d":65,"glslify":66,"gl-vao":67,"gl-buffer":68,"ndarray":44,"typedarray-pool":69,"ndarray-ops":70,"gl-mat4":6,"distance-transform":71,"extract-frustum-planes":72,"convex-boundary-3d":73,"ndarray-imshow":74}],64:[function(require,module,exports){
+},{"glslify/adapter.js":62,"cwise/lib/wrapper":63,"glslify":64,"bit-twiddle":65,"ndarray":43,"gl-texture2d":66,"gl-vao":67,"gl-mat4":7,"typedarray-pool":68,"gl-buffer":69,"ndarray-ops":70,"extract-frustum-planes":71,"distance-transform":72,"convex-boundary-3d":73,"ndarray-imshow":74}],64:[function(require,module,exports){
+module.exports = noop
+
+function noop() {
+  throw new Error(
+      'You should bundle your code ' +
+      'using `glslify` as a transform.'
+  )
+}
+
+},{}],65:[function(require,module,exports){
 /**
  * Bit twiddling hacks for JavaScript.
  *
@@ -14536,17 +14552,7 @@ exports.nextCombination = function(v) {
 }
 
 
-},{}],66:[function(require,module,exports){
-module.exports = noop
-
-function noop() {
-  throw new Error(
-      'You should bundle your code ' +
-      'using `glslify` as a transform.'
-  )
-}
-
-},{}],72:[function(require,module,exports){
+},{}],71:[function(require,module,exports){
 "use strict"
 
 module.exports = extractPlanes
@@ -14671,7 +14677,18 @@ function compileCwise(user_args) {
 
 module.exports = compileCwise
 
-},{"./lib/thunk.js":75}],76:[function(require,module,exports){
+},{"./lib/thunk.js":75}],62:[function(require,module,exports){
+module.exports = programify
+
+var shader = require('gl-shader-core')
+
+function programify(vertex, fragment, uniforms, attributes) {
+  return function(gl) {
+    return shader(gl, vertex, fragment, uniforms, attributes)
+  }
+}
+
+},{"gl-shader-core":76}],77:[function(require,module,exports){
 "use strict"
 
 var abs = Math.abs
@@ -14727,7 +14744,7 @@ module.exports = function phase2_1(array, nrows, ncols, s, t) {
     }
   }
 }
-},{}],77:[function(require,module,exports){
+},{}],78:[function(require,module,exports){
 "use strict"
 
 function dist_2(a, b) {
@@ -14775,7 +14792,7 @@ module.exports = function phase2_2(array, nrows, ncols, s, t) {
     }
   }
 }
-},{}],78:[function(require,module,exports){
+},{}],79:[function(require,module,exports){
 "use strict"
 
 var abs = Math.abs
@@ -14831,18 +14848,7 @@ module.exports = function phase2_inf(array, nrows, ncols, s, t) {
     }
   }
 }
-},{}],62:[function(require,module,exports){
-module.exports = programify
-
-var shader = require('gl-shader-core')
-
-function programify(vertex, fragment, uniforms, attributes) {
-  return function(gl) {
-    return shader(gl, vertex, fragment, uniforms, attributes)
-  }
-}
-
-},{"gl-shader-core":79}],67:[function(require,module,exports){
+},{}],67:[function(require,module,exports){
 "use strict"
 
 var webglew = require("webglew")
@@ -14862,56 +14868,7 @@ function createVAO(gl, attributes, elements, elementsType) {
 }
 
 module.exports = createVAO
-},{"./lib/vao-native.js":80,"./lib/vao-emulated.js":81,"webglew":82}],75:[function(require,module,exports){
-"use strict"
-
-var compile = require("./compile.js")
-
-function createThunk(proc) {
-  var code = ["'use strict'", "var CACHED={}"]
-  var vars = []
-  var thunkName = proc.funcName + "_cwise_thunk"
-  
-  //Build thunk
-  code.push(["return function ", thunkName, "(", proc.shimArgs.join(","), "){"].join(""))
-  var typesig = []
-  var string_typesig = []
-  var proc_args = [["array",proc.arrayArgs[0],".shape"].join("")]
-  for(var i=0; i<proc.arrayArgs.length; ++i) {
-    var j = proc.arrayArgs[i]
-    vars.push(["t", j, "=array", j, ".dtype,",
-               "r", j, "=array", j, ".order"].join(""))
-    typesig.push("t" + j)
-    typesig.push("r" + j)
-    string_typesig.push("t"+j)
-    string_typesig.push("r"+j+".join()")
-    proc_args.push("array" + j + ".data")
-    proc_args.push("array" + j + ".stride")
-    proc_args.push("array" + j + ".offset|0")
-  }
-  for(var i=0; i<proc.scalarArgs.length; ++i) {
-    proc_args.push("scalar" + proc.scalarArgs[i])
-  }
-  vars.push(["type=[", string_typesig.join(","), "].join()"].join(""))
-  vars.push("proc=CACHED[type]")
-  code.push("var " + vars.join(","))
-  
-  code.push(["if(!proc){",
-             "CACHED[type]=proc=compile([", typesig.join(","), "])}",
-             "return proc(", proc_args.join(","), ")}"].join(""))
-
-  if(proc.debug) {
-    console.log("Generated thunk:", code.join("\n"))
-  }
-  
-  //Compile thunk
-  var thunk = new Function("compile", code.join("\n"))
-  return thunk(compile.bind(undefined, proc))
-}
-
-module.exports = createThunk
-
-},{"./compile.js":83}],70:[function(require,module,exports){
+},{"./lib/vao-native.js":80,"./lib/vao-emulated.js":81,"webglew":82}],70:[function(require,module,exports){
 "use strict"
 
 var compile = require("cwise-compiler")
@@ -15374,7 +15331,7 @@ exports.equals = compile({
 
 
 
-},{"cwise-compiler":84}],73:[function(require,module,exports){
+},{"cwise-compiler":83}],73:[function(require,module,exports){
 "use strict"
 
 var planeToPoly = require("plane-to-polygon")
@@ -15400,7 +15357,7 @@ outer:
   }
   return result
 }
-},{"plane-to-polygon":85,"split-polygon":86}],74:[function(require,module,exports){
+},{"split-polygon":84,"plane-to-polygon":85}],74:[function(require,module,exports){
 "use strict"
 
 module.exports = imshow
@@ -15414,7 +15371,56 @@ function imshow(array, options) {
     consoleImg(savePixels(img, "canvas"))
   })
 }
-},{"./do-colorize.js":87,"console-image":88,"save-pixels":89}],80:[function(require,module,exports){
+},{"./do-colorize.js":86,"save-pixels":87,"console-image":88}],75:[function(require,module,exports){
+"use strict"
+
+var compile = require("./compile.js")
+
+function createThunk(proc) {
+  var code = ["'use strict'", "var CACHED={}"]
+  var vars = []
+  var thunkName = proc.funcName + "_cwise_thunk"
+  
+  //Build thunk
+  code.push(["return function ", thunkName, "(", proc.shimArgs.join(","), "){"].join(""))
+  var typesig = []
+  var string_typesig = []
+  var proc_args = [["array",proc.arrayArgs[0],".shape"].join("")]
+  for(var i=0; i<proc.arrayArgs.length; ++i) {
+    var j = proc.arrayArgs[i]
+    vars.push(["t", j, "=array", j, ".dtype,",
+               "r", j, "=array", j, ".order"].join(""))
+    typesig.push("t" + j)
+    typesig.push("r" + j)
+    string_typesig.push("t"+j)
+    string_typesig.push("r"+j+".join()")
+    proc_args.push("array" + j + ".data")
+    proc_args.push("array" + j + ".stride")
+    proc_args.push("array" + j + ".offset|0")
+  }
+  for(var i=0; i<proc.scalarArgs.length; ++i) {
+    proc_args.push("scalar" + proc.scalarArgs[i])
+  }
+  vars.push(["type=[", string_typesig.join(","), "].join()"].join(""))
+  vars.push("proc=CACHED[type]")
+  code.push("var " + vars.join(","))
+  
+  code.push(["if(!proc){",
+             "CACHED[type]=proc=compile([", typesig.join(","), "])}",
+             "return proc(", proc_args.join(","), ")}"].join(""))
+
+  if(proc.debug) {
+    console.log("Generated thunk:", code.join("\n"))
+  }
+  
+  //Compile thunk
+  var thunk = new Function("compile", code.join("\n"))
+  return thunk(compile.bind(undefined, proc))
+}
+
+module.exports = createThunk
+
+},{"./compile.js":89}],80:[function(require,module,exports){
 "use strict"
 
 var bindAttribs = require("./do-bind.js")
@@ -15592,56 +15598,7 @@ function dupe(count, value) {
 }
 
 module.exports = dupe
-},{}],88:[function(require,module,exports){
-
-module.exports = nicer
-module.exports.plain = log
-
-function nicer(image, scale) {
-  if (typeof image === 'string') {
-    var img = new Image
-    img.onload = log.bind(null, img, scale)
-    img.src = image
-    return img
-  }
-
-  var element = image.nodeName || ''
-  if (element.toLowerCase() === 'img') return log(image, scale)
-  if (element.toLowerCase() === 'canvas') {
-    var img = new Image
-    img.onload = log.bind(null, img, scale)
-    img.src = image.toDataURL()
-  }
-}
-
-function log(image, scale) {
-  scale = scale || 1
-
-  var width = image.width * scale
-    , height = image.height * scale
-
-  console.log('%c+', [
-      'font-size:1px;'
-    , 'padding:'
-    , Math.floor(height / 2) + 'px '
-    , Math.floor(width / 2) + 'px;'
-    , 'line-height:' + height + 'px;'
-    , 'background:url('
-    , image.src
-      .replace(/\(/g, '%28')
-      .replace(/\)/g, '%29')
-    , ');'
-    , 'background-size:'
-    , width + 'px '
-    , height + 'px;'
-    , 'color:transparent;'
-  ].join(''))
-
-  return image
-}
-
-
-},{}],65:[function(require,module,exports){
+},{}],66:[function(require,module,exports){
 'use strict'
 
 var ndarray = require('ndarray')
@@ -16197,159 +16154,7 @@ function createTexture2D(gl) {
   }
   throw new Error("Invalid arguments for texture2d constructor")
 }
-},{"ndarray-ops":92,"typedarray-pool":93,"webglew":94,"ndarray":44}],68:[function(require,module,exports){
-"use strict"
-
-var pool = require("typedarray-pool")
-var ops = require("ndarray-ops")
-var ndarray = require("ndarray")
-var webglew = require("webglew")
-
-var SUPPORTED_TYPES = [
-  "uint8",
-  "uint8_clamped",
-  "uint16",
-  "uint32",
-  "int8",
-  "int16",
-  "int32",
-  "float32" ]
-
-function GLBuffer(gl, type, handle, length, usage) {
-  this.gl = gl
-  this.type = type
-  this.handle = handle
-  this.length = length
-  this.usage = usage
-}
-
-var proto = GLBuffer.prototype
-
-proto.bind = function() {
-  this.gl.bindBuffer(this.type, this.handle)
-}
-
-proto.dispose = function() {
-  this.gl.deleteBuffer(this.handle)
-}
-
-function updateTypeArray(gl, type, len, usage, data, offset) {
-  var dataLen = data.length * data.BYTES_PER_ELEMENT 
-  if(offset < 0) {
-    gl.bufferData(type, data, usage)
-    return dataLen
-  }
-  if(dataLen + offset > len) {
-    throw new Error("gl-buffer: If resizing buffer, must not specify offset")
-  }
-  gl.bufferSubData(type, offset, data)
-  return len
-}
-
-function makeScratchTypeArray(array, dtype) {
-  var res = pool.malloc(array.length, dtype)
-  var n = array.length
-  for(var i=0; i<n; ++i) {
-    res[i] = array[i]
-  }
-  return res
-}
-
-function isPacked(shape, stride) {
-  var n = 1
-  for(var i=stride.length-1; i>=0; --i) {
-    if(stride[i] !== n) {
-      return false
-    }
-    n *= shape[i]
-  }
-  return true
-}
-
-proto.update = function(array, offset) {
-  if(typeof offset !== "number") {
-    offset = -1
-  }
-  this.bind()
-  if(typeof array === "object" && typeof array.shape !== "undefined") { //ndarray
-    var dtype = array.dtype
-    if(SUPPORTED_TYPES.indexOf(dtype) < 0) {
-      dtype = "float32"
-    }
-    if(this.type === this.gl.ELEMENT_ARRAY_BUFFER) {
-      var wgl = webglew(this.gl)
-      var ext = wgl.OES_element_index_uint
-      if(ext && dtype !== "uint16") {
-        dtype = "uint32"
-      } else {
-        dtype = "uint16"
-      }
-    }
-    if(dtype === array.dtype && isPacked(array.shape, array.stride)) {
-      if(array.offset === 0 && array.data.length === array.shape[0]) {
-        this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, array.data, offset)
-      } else {
-        this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, array.data.subarray(array.offset, array.shape[0]), offset)
-      }
-    } else {
-      var tmp = pool.malloc(array.size, dtype)
-      var ndt = ndarray(tmp, array.shape)
-      ops.assign(ndt, array)
-      if(offset < 0) {
-        this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, tmp, offset)  
-      } else {
-        this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, tmp.subarray(0, array.size), offset)  
-      }
-      pool.free(tmp)
-    }
-  } else if(Array.isArray(array)) { //Vanilla array
-    var t
-    if(this.type === this.gl.ELEMENT_ARRAY_BUFFER) {
-      t = makeScratchTypeArray(array, "uint16")
-    } else {
-      t = makeScratchTypeArray(array, "float32")
-    }
-    if(offset < 0) {
-      this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, t, offset)
-    } else {
-      this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, t.subarray(0, array.length), offset)
-    }
-    pool.free(t)
-  } else if(typeof array === "object" && typeof array.length === "number") { //Typed array
-    this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, array, offset)
-  } else if(typeof array === "number" || array === undefined) { //Number/default
-    if(offset >= 0) {
-      throw new Error("gl-buffer: Cannot specify offset when resizing buffer")
-    }
-    array = array | 0
-    if(array <= 0) {
-      array = 1
-    }
-    this.gl.bufferData(this.type, array|0, this.usage)
-    this.length = array
-  } else { //Error, case should not happen
-    throw new Error("gl-buffer: Invalid data type")
-  }
-}
-
-function createBuffer(gl, data, type, usage) {
-  webglew(gl)
-  type = type || gl.ARRAY_BUFFER
-  usage = usage || gl.DYNAMIC_DRAW
-  if(type !== gl.ARRAY_BUFFER && type !== gl.ELEMENT_ARRAY_BUFFER) {
-    throw new Error("gl-buffer: Invalid type for webgl buffer, must be either gl.ARRAY_BUFFER or gl.ELEMENT_ARRAY_BUFFER")
-  }
-  if(usage !== gl.DYNAMIC_DRAW && usage !== gl.STATIC_DRAW && usage !== gl.STREAM_DRAW) {
-    throw new Error("gl-buffer: Invalid usage for buffer, must be either gl.DYNAMIC_DRAW, gl.STATIC_DRAW or gl.STREAM_DRAW")
-  }
-  var handle = gl.createBuffer()
-  var result = new GLBuffer(gl, type, handle, 0, usage)
-  result.update(data)
-  return result
-}
-
-module.exports = createBuffer
-},{"typedarray-pool":95,"ndarray-ops":96,"webglew":97,"ndarray":44}],69:[function(require,module,exports){
+},{"ndarray-ops":92,"webglew":93,"typedarray-pool":94,"ndarray":43}],68:[function(require,module,exports){
 (function(global,Buffer){var bits = require("bit-twiddle")
 var dup = require("dup")
 if(!global.__TYPEDARRAY_POOL) {
@@ -16718,7 +16523,210 @@ exports.clearCache = function clearCache() {
   }
 }
 })(self,require("__browserify_Buffer").Buffer)
-},{"dup":91,"bit-twiddle":64,"__browserify_Buffer":40}],71:[function(require,module,exports){
+},{"dup":91,"bit-twiddle":65,"__browserify_Buffer":44}],63:[function(require,module,exports){
+module.exports = require("cwise-compiler")
+},{"cwise-compiler":95}],69:[function(require,module,exports){
+"use strict"
+
+var pool = require("typedarray-pool")
+var ops = require("ndarray-ops")
+var ndarray = require("ndarray")
+var webglew = require("webglew")
+
+var SUPPORTED_TYPES = [
+  "uint8",
+  "uint8_clamped",
+  "uint16",
+  "uint32",
+  "int8",
+  "int16",
+  "int32",
+  "float32" ]
+
+function GLBuffer(gl, type, handle, length, usage) {
+  this.gl = gl
+  this.type = type
+  this.handle = handle
+  this.length = length
+  this.usage = usage
+}
+
+var proto = GLBuffer.prototype
+
+proto.bind = function() {
+  this.gl.bindBuffer(this.type, this.handle)
+}
+
+proto.dispose = function() {
+  this.gl.deleteBuffer(this.handle)
+}
+
+function updateTypeArray(gl, type, len, usage, data, offset) {
+  var dataLen = data.length * data.BYTES_PER_ELEMENT 
+  if(offset < 0) {
+    gl.bufferData(type, data, usage)
+    return dataLen
+  }
+  if(dataLen + offset > len) {
+    throw new Error("gl-buffer: If resizing buffer, must not specify offset")
+  }
+  gl.bufferSubData(type, offset, data)
+  return len
+}
+
+function makeScratchTypeArray(array, dtype) {
+  var res = pool.malloc(array.length, dtype)
+  var n = array.length
+  for(var i=0; i<n; ++i) {
+    res[i] = array[i]
+  }
+  return res
+}
+
+function isPacked(shape, stride) {
+  var n = 1
+  for(var i=stride.length-1; i>=0; --i) {
+    if(stride[i] !== n) {
+      return false
+    }
+    n *= shape[i]
+  }
+  return true
+}
+
+proto.update = function(array, offset) {
+  if(typeof offset !== "number") {
+    offset = -1
+  }
+  this.bind()
+  if(typeof array === "object" && typeof array.shape !== "undefined") { //ndarray
+    var dtype = array.dtype
+    if(SUPPORTED_TYPES.indexOf(dtype) < 0) {
+      dtype = "float32"
+    }
+    if(this.type === this.gl.ELEMENT_ARRAY_BUFFER) {
+      var wgl = webglew(this.gl)
+      var ext = wgl.OES_element_index_uint
+      if(ext && dtype !== "uint16") {
+        dtype = "uint32"
+      } else {
+        dtype = "uint16"
+      }
+    }
+    if(dtype === array.dtype && isPacked(array.shape, array.stride)) {
+      if(array.offset === 0 && array.data.length === array.shape[0]) {
+        this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, array.data, offset)
+      } else {
+        this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, array.data.subarray(array.offset, array.shape[0]), offset)
+      }
+    } else {
+      var tmp = pool.malloc(array.size, dtype)
+      var ndt = ndarray(tmp, array.shape)
+      ops.assign(ndt, array)
+      if(offset < 0) {
+        this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, tmp, offset)  
+      } else {
+        this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, tmp.subarray(0, array.size), offset)  
+      }
+      pool.free(tmp)
+    }
+  } else if(Array.isArray(array)) { //Vanilla array
+    var t
+    if(this.type === this.gl.ELEMENT_ARRAY_BUFFER) {
+      t = makeScratchTypeArray(array, "uint16")
+    } else {
+      t = makeScratchTypeArray(array, "float32")
+    }
+    if(offset < 0) {
+      this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, t, offset)
+    } else {
+      this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, t.subarray(0, array.length), offset)
+    }
+    pool.free(t)
+  } else if(typeof array === "object" && typeof array.length === "number") { //Typed array
+    this.length = updateTypeArray(this.gl, this.type, this.length, this.usage, array, offset)
+  } else if(typeof array === "number" || array === undefined) { //Number/default
+    if(offset >= 0) {
+      throw new Error("gl-buffer: Cannot specify offset when resizing buffer")
+    }
+    array = array | 0
+    if(array <= 0) {
+      array = 1
+    }
+    this.gl.bufferData(this.type, array|0, this.usage)
+    this.length = array
+  } else { //Error, case should not happen
+    throw new Error("gl-buffer: Invalid data type")
+  }
+}
+
+function createBuffer(gl, data, type, usage) {
+  webglew(gl)
+  type = type || gl.ARRAY_BUFFER
+  usage = usage || gl.DYNAMIC_DRAW
+  if(type !== gl.ARRAY_BUFFER && type !== gl.ELEMENT_ARRAY_BUFFER) {
+    throw new Error("gl-buffer: Invalid type for webgl buffer, must be either gl.ARRAY_BUFFER or gl.ELEMENT_ARRAY_BUFFER")
+  }
+  if(usage !== gl.DYNAMIC_DRAW && usage !== gl.STATIC_DRAW && usage !== gl.STREAM_DRAW) {
+    throw new Error("gl-buffer: Invalid usage for buffer, must be either gl.DYNAMIC_DRAW, gl.STATIC_DRAW or gl.STREAM_DRAW")
+  }
+  var handle = gl.createBuffer()
+  var result = new GLBuffer(gl, type, handle, 0, usage)
+  result.update(data)
+  return result
+}
+
+module.exports = createBuffer
+},{"webglew":96,"typedarray-pool":97,"ndarray-ops":98,"ndarray":43}],88:[function(require,module,exports){
+
+module.exports = nicer
+module.exports.plain = log
+
+function nicer(image, scale) {
+  if (typeof image === 'string') {
+    var img = new Image
+    img.onload = log.bind(null, img, scale)
+    img.src = image
+    return img
+  }
+
+  var element = image.nodeName || ''
+  if (element.toLowerCase() === 'img') return log(image, scale)
+  if (element.toLowerCase() === 'canvas') {
+    var img = new Image
+    img.onload = log.bind(null, img, scale)
+    img.src = image.toDataURL()
+  }
+}
+
+function log(image, scale) {
+  scale = scale || 1
+
+  var width = image.width * scale
+    , height = image.height * scale
+
+  console.log('%c+', [
+      'font-size:1px;'
+    , 'padding:'
+    , Math.floor(height / 2) + 'px '
+    , Math.floor(width / 2) + 'px;'
+    , 'line-height:' + height + 'px;'
+    , 'background:url('
+    , image.src
+      .replace(/\(/g, '%28')
+      .replace(/\)/g, '%29')
+    , ');'
+    , 'background-size:'
+    , width + 'px '
+    , height + 'px;'
+    , 'color:transparent;'
+  ].join(''))
+
+  return image
+}
+
+
+},{}],72:[function(require,module,exports){
 "use strict"
 
 var ndarray = require("ndarray")
@@ -16825,9 +16833,62 @@ module.exports = function distanceTransform(array, p) {
   pool.freeUint32(t_q)
   return array
 }
-},{"./lib/p1.js":76,"./lib/p2.js":77,"./lib/pinf.js":78,"./lib/pp.js":98,"cwise":99,"ndarray-ops":100,"typedarray-pool":101,"ndarray":44}],63:[function(require,module,exports){
-module.exports = require("cwise-compiler")
-},{"cwise-compiler":102}],79:[function(require,module,exports){
+},{"./lib/p1.js":77,"./lib/p2.js":78,"./lib/pinf.js":79,"./lib/pp.js":99,"cwise":100,"typedarray-pool":101,"ndarray-ops":102,"ndarray":43}],90:[function(require,module,exports){
+"use strict"
+
+function doBind(gl, elements, attributes) {
+  if(elements) {
+    elements.bind()
+  } else {
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
+  }
+  var nattribs = gl.getParameter(gl.MAX_VERTEX_ATTRIBS)|0
+  if(attributes) {
+    if(attributes.length > nattribs) {
+      throw new Error("gl-vao: Too many vertex attributes")
+    }
+    for(var i=0; i<attributes.length; ++i) {
+      var attrib = attributes[i]
+      if(attrib.buffer) {
+        var buffer = attrib.buffer
+        var size = attrib.size || 4
+        var type = attrib.type || gl.FLOAT
+        var normalized = !!attrib.normalized
+        var stride = attrib.stride || 0
+        var offset = attrib.offset || 0
+        buffer.bind()
+        gl.enableVertexAttribArray(i)
+        gl.vertexAttribPointer(i, size, type, normalized, stride, offset)
+      } else {
+        if(typeof attrib === "number") {
+          gl.vertexAttrib1f(i, attrib)
+        } else if(attrib.length === 1) {
+          gl.vertexAttrib1f(i, attrib[0])
+        } else if(attrib.length === 2) {
+          gl.vertexAttrib2f(i, attrib[0], attrib[1])
+        } else if(attrib.length === 3) {
+          gl.vertexAttrib3f(i, attrib[0], attrib[1], attrib[2])
+        } else if(attrib.length === 4) {
+          gl.vertexAttrib4f(i, attrib[0], attrib[1], attrib[2], attrib[3])
+        } else {
+          throw new Error("gl-vao: Invalid vertex attribute")
+        }
+        gl.disableVertexAttribArray(i)
+      }
+    }
+    for(; i<nattribs; ++i) {
+      gl.disableVertexAttribArray(i)
+    }
+  } else {
+    gl.bindBuffer(gl.ARRAY_BUFFER, null)
+    for(var i=0; i<nattribs; ++i) {
+      gl.disableVertexAttribArray(i)
+    }
+  }
+}
+
+module.exports = doBind
+},{}],76:[function(require,module,exports){
 "use strict"
 
 var createUniformWrapper = require("./lib/create-uniforms.js")
@@ -16951,62 +17012,7 @@ function createShader(
 
 module.exports = createShader
 
-},{"./lib/create-uniforms.js":103,"./lib/create-attributes.js":104,"./lib/reflect.js":105}],90:[function(require,module,exports){
-"use strict"
-
-function doBind(gl, elements, attributes) {
-  if(elements) {
-    elements.bind()
-  } else {
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
-  }
-  var nattribs = gl.getParameter(gl.MAX_VERTEX_ATTRIBS)|0
-  if(attributes) {
-    if(attributes.length > nattribs) {
-      throw new Error("gl-vao: Too many vertex attributes")
-    }
-    for(var i=0; i<attributes.length; ++i) {
-      var attrib = attributes[i]
-      if(attrib.buffer) {
-        var buffer = attrib.buffer
-        var size = attrib.size || 4
-        var type = attrib.type || gl.FLOAT
-        var normalized = !!attrib.normalized
-        var stride = attrib.stride || 0
-        var offset = attrib.offset || 0
-        buffer.bind()
-        gl.enableVertexAttribArray(i)
-        gl.vertexAttribPointer(i, size, type, normalized, stride, offset)
-      } else {
-        if(typeof attrib === "number") {
-          gl.vertexAttrib1f(i, attrib)
-        } else if(attrib.length === 1) {
-          gl.vertexAttrib1f(i, attrib[0])
-        } else if(attrib.length === 2) {
-          gl.vertexAttrib2f(i, attrib[0], attrib[1])
-        } else if(attrib.length === 3) {
-          gl.vertexAttrib3f(i, attrib[0], attrib[1], attrib[2])
-        } else if(attrib.length === 4) {
-          gl.vertexAttrib4f(i, attrib[0], attrib[1], attrib[2], attrib[3])
-        } else {
-          throw new Error("gl-vao: Invalid vertex attribute")
-        }
-        gl.disableVertexAttribArray(i)
-      }
-    }
-    for(; i<nattribs; ++i) {
-      gl.disableVertexAttribArray(i)
-    }
-  } else {
-    gl.bindBuffer(gl.ARRAY_BUFFER, null)
-    for(var i=0; i<nattribs; ++i) {
-      gl.disableVertexAttribArray(i)
-    }
-  }
-}
-
-module.exports = doBind
-},{}],84:[function(require,module,exports){
+},{"./lib/create-uniforms.js":103,"./lib/create-attributes.js":104,"./lib/reflect.js":105}],83:[function(require,module,exports){
 "use strict"
 
 var createThunk = require("./lib/thunk.js")
@@ -17269,7 +17275,7 @@ function makeReflectTypes(uniforms, useIndex) {
   }
   return obj
 }
-},{}],102:[function(require,module,exports){
+},{}],95:[function(require,module,exports){
 "use strict"
 
 var createThunk = require("./lib/thunk.js")
@@ -17377,7 +17383,7 @@ function compileCwise(user_args) {
 
 module.exports = compileCwise
 
-},{"./lib/thunk.js":107}],87:[function(require,module,exports){
+},{"./lib/thunk.js":107}],86:[function(require,module,exports){
 "use strict"
 
 module.exports = doColorize
@@ -17446,7 +17452,913 @@ function doColorize(img, options, cb) {
     throw new Error("invalid image dimensions")
   }
 }
-},{"apply-colormap":108,"luminance":109,"ndarray":44,"typedarray-pool":69,"ndarray-ops":70}],98:[function(require,module,exports){
+},{"apply-colormap":108,"luminance":109,"ndarray":43,"typedarray-pool":68,"ndarray-ops":70}],82:[function(require,module,exports){
+"use strict";
+
+var weakMap = typeof WeakMap === "undefined" ? require("weakmap") : WeakMap
+
+var WebGLEWStruct = new weakMap()
+
+function baseName(ext_name) {
+  return ext_name.replace(/^[A-Z]+_/, "")
+}
+
+function initWebGLEW(gl) {
+  var struct = WebGLEWStruct.get(gl)
+  if(struct) {
+    return struct
+  }
+  var extensions = {}
+  var supported = gl.getSupportedExtensions()
+  for(var i=0; i<supported.length; ++i) {
+    var extName = supported[i]
+    var ext = gl.getExtension(supported[i])
+    if(!ext) {
+      continue
+    }
+    while(true) {
+      extensions[extName] = ext
+      var base = baseName(extName)
+      if(base === extName) {
+        break
+      }
+      extName = base
+    }
+  }
+  WebGLEWStruct.set(gl, extensions)
+  return extensions
+}
+module.exports = initWebGLEW
+},{"weakmap":110}],93:[function(require,module,exports){
+"use strict";
+
+var weakMap = typeof WeakMap === "undefined" ? require("weakmap") : WeakMap
+
+var WebGLEWStruct = new weakMap()
+
+function baseName(ext_name) {
+  return ext_name.replace(/^[A-Z]+_/, "")
+}
+
+function initWebGLEW(gl) {
+  var struct = WebGLEWStruct.get(gl)
+  if(struct) {
+    return struct
+  }
+  var extensions = {}
+  var supported = gl.getSupportedExtensions()
+  for(var i=0; i<supported.length; ++i) {
+    var extName = supported[i]
+    var ext = gl.getExtension(supported[i])
+    if(!ext) {
+      continue
+    }
+    while(true) {
+      extensions[extName] = ext
+      var base = baseName(extName)
+      if(base === extName) {
+        break
+      }
+      extName = base
+    }
+  }
+  WebGLEWStruct.set(gl, extensions)
+  return extensions
+}
+module.exports = initWebGLEW
+},{"weakmap":111}],94:[function(require,module,exports){
+(function(global,Buffer){var bits = require("bit-twiddle")
+var dup = require("dup")
+if(!global.__TYPEDARRAY_POOL) {
+  global.__TYPEDARRAY_POOL = {
+      UINT8   : dup([32, 0])
+    , UINT16  : dup([32, 0])
+    , UINT32  : dup([32, 0])
+    , INT8    : dup([32, 0])
+    , INT16   : dup([32, 0])
+    , INT32   : dup([32, 0])
+    , FLOAT   : dup([32, 0])
+    , DOUBLE  : dup([32, 0])
+    , DATA    : dup([32, 0])
+    , UINT8C  : dup([32, 0])
+    , BUFFER  : dup([32, 0])
+  }
+}
+var hasUint8C = (typeof Uint8ClampedArray) !== "undefined"
+var POOL = global.__TYPEDARRAY_POOL
+if(!POOL.UINT8C) {
+  POOL.UINT8C = dup([32, 0])
+}
+if(!POOL.BUFFER) {
+  POOL.BUFFER = dup([32, 0])
+}
+var UINT8   = POOL.UINT8
+  , UINT16  = POOL.UINT16
+  , UINT32  = POOL.UINT32
+  , INT8    = POOL.INT8
+  , INT16   = POOL.INT16
+  , INT32   = POOL.INT32
+  , FLOAT   = POOL.FLOAT
+  , DOUBLE  = POOL.DOUBLE
+  , DATA    = POOL.DATA
+  , UINT8C  = POOL.UINT8C
+  , BUFFER  = POOL.BUFFER
+
+exports.free = function free(array) {
+  var n = array.length|0
+    , log_n = bits.log2(n)
+  if(Buffer.isBuffer(array)) {
+    BUFFER[log_n].push(array)
+  } else {
+    switch(Object.prototype.toString.call(array)) {
+      case "[object Uint8Array]":
+        UINT8[log_n].push(array)
+      break
+      case "[object Uint16Array]":
+        UINT16[log_n].push(array)
+      break
+      case "[object Uint32Array]":
+        UINT32[log_n].push(array)
+      break
+      case "[object Int8Array]":
+        INT8[log_n].push(array)
+      break
+      case "[object Int16Array]":
+        INT16[log_n].push(array)
+      break
+      case "[object Int32Array]":
+        INT32[log_n].push(array)
+      break
+      case "[object Uint8ClampedArray]":
+        UINT8C[log_n].push(array)
+      break
+      case "[object Float32Array]":
+        FLOAT[log_n].push(array)
+      break
+      case "[object Float64Array]":
+        DOUBLE[log_n].push(array)
+      break
+      case "[object ArrayBuffer]":
+        DATA[log_n].push(array)
+      break
+      default:
+        throw new Error("typedarray-pool: Unspecified array type")
+    }
+  }
+}
+
+exports.freeUint8 = function freeUint8(array) {
+  UINT8[bits.log2(array.length)].push(array)
+}
+
+exports.freeUint16 = function freeUint16(array) {
+  UINT16[bits.log2(array.length)].push(array)
+}
+
+exports.freeUint32 = function freeUint32(array) {
+  UINT32[bits.log2(array.length)].push(array)
+}
+
+exports.freeInt8 = function freeInt8(array) {
+  INT8[bits.log2(array.length)].push(array)
+}
+
+exports.freeInt16 = function freeInt16(array) {
+  INT16[bits.log2(array.length)].push(array)
+}
+
+exports.freeInt32 = function freeInt32(array) {
+  INT32[bits.log2(array.length)].push(array)
+}
+
+exports.freeFloat32 = exports.freeFloat = function freeFloat(array) {
+  FLOAT[bits.log2(array.length)].push(array)
+}
+
+exports.freeFloat64 = exports.freeDouble = function freeDouble(array) {
+  DOUBLE[bits.log2(array.length)].push(array)
+}
+
+exports.freeArrayBuffer = function freeArrayBuffer(array) {
+  DATA[bits.log2(array.length)].push(array)
+}
+
+if(hasUint8C) {
+  exports.freeUint8Clamped = function freeUint8Clamped(array) {
+    UINT8C[bits.log2(array.length)].push(array)
+  }
+} else {
+  exports.freeUint8Clamped = exports.freeUint8
+}
+
+exports.freeBuffer = function freeBuffer(array) {
+  BUFFER[bits.log2(array.length)].push(array)
+}
+
+exports.malloc = function malloc(n, dtype) {
+  n = bits.nextPow2(n)
+  var log_n = bits.log2(n)
+  if(dtype === undefined || dtype === "arraybuffer") {
+    var d = DATA[log_n]
+    if(d.length > 0) {
+      var r = d[d.length-1]
+      d.pop()
+      return r
+    }
+    return new ArrayBuffer(n)
+  } else {
+    switch(dtype) {
+      case "uint8":
+        var u8 = UINT8[log_n]
+        if(u8.length > 0) {
+          return u8.pop()
+        }
+        return new Uint8Array(n)
+      break
+
+      case "uint16":
+        var u16 = UINT16[log_n]
+        if(u16.length > 0) {
+          return u16.pop()
+        }
+        return new Uint16Array(n)
+      break
+
+      case "uint32":
+        var u32 = UINT32[log_n]
+        if(u32.length > 0) {
+          return u32.pop()
+        }
+        return new Uint32Array(n)
+      break
+
+      case "int8":
+        var i8 = INT8[log_n]
+        if(i8.length > 0) {
+          return i8.pop()
+        }
+        return new Int8Array(n)
+      break
+
+      case "int16":
+        var i16 = INT16[log_n]
+        if(i16.length > 0) {
+          return i16.pop()
+        }
+        return new Int16Array(n)
+      break
+
+      case "int32":
+        var i32 = INT32[log_n]
+        if(i32.length > 0) {
+          return i32.pop()
+        }
+        return new Int32Array(n)
+      break
+
+      case "float":
+      case "float32":
+        var f = FLOAT[log_n]
+        if(f.length > 0) {
+          return f.pop()
+        }
+        return new Float32Array(n)
+      break
+
+      case "double":
+      case "float64":
+        var dd = DOUBLE[log_n]
+        if(dd.length > 0) {
+          return dd.pop()
+        }
+        return new Float64Array(n)
+      break
+
+      case "uint8_clamped":
+        if(hasUint8C) {
+          var u8c = UINT8C[log_n]
+          if(u8c.length > 0) {
+            return u8c.pop()
+          }
+          return new Uint8ClampedArray(n)
+        } else {
+          var u8 = UINT8[log_n]
+          if(u8.length > 0) {
+            return u8.pop()
+          }
+          return new Uint8Array(n)
+        }
+      break
+
+      case "buffer":
+        var buf = BUFFER[log_n]
+        if(buf.length > 0) {
+          return buf.pop()
+        }
+        return new Buffer(n)
+      break
+
+      default:
+        return null
+    }
+  }
+  return null
+}
+
+exports.mallocUint8 = function mallocUint8(n) {
+  n = bits.nextPow2(n)
+  var log_n = bits.log2(n)
+  var cache = UINT8[log_n]
+  if(cache.length > 0) {
+    return cache.pop()
+  }
+  return new Uint8Array(n)
+}
+
+exports.mallocUint16 = function mallocUint16(n) {
+  n = bits.nextPow2(n)
+  var log_n = bits.log2(n)
+  var cache = UINT16[log_n]
+  if(cache.length > 0) {
+    return cache.pop()
+  }
+  return new Uint16Array(n)
+}
+
+exports.mallocUint32 = function mallocUint32(n) {
+  n = bits.nextPow2(n)
+  var log_n = bits.log2(n)
+  var cache = UINT32[log_n]
+  if(cache.length > 0) {
+    return cache.pop()
+  }
+  return new Uint32Array(n)
+}
+
+exports.mallocInt8 = function mallocInt8(n) {
+  n = bits.nextPow2(n)
+  var log_n = bits.log2(n)
+  var cache = INT8[log_n]
+  if(cache.length > 0) {
+    return cache.pop()
+  }
+  return new Int8Array(n)
+}
+
+exports.mallocInt16 = function mallocInt16(n) {
+  n = bits.nextPow2(n)
+  var log_n = bits.log2(n)
+  var cache = INT16[log_n]
+  if(cache.length > 0) {
+    return cache.pop()
+  }
+  return new Int16Array(n)
+}
+
+exports.mallocInt32 = function mallocInt32(n) {
+  n = bits.nextPow2(n)
+  var log_n = bits.log2(n)
+  var cache = INT32[log_n]
+  if(cache.length > 0) {
+    return cache.pop()
+  }
+  return new Int32Array(n)
+}
+
+exports.mallocFloat32 = exports.mallocFloat = function mallocFloat(n) {
+  n = bits.nextPow2(n)
+  var log_n = bits.log2(n)
+  var cache = FLOAT[log_n]
+  if(cache.length > 0) {
+    return cache.pop()
+  }
+  return new Float32Array(n)
+}
+
+exports.mallocFloat64 = exports.mallocDouble = function mallocDouble(n) {
+  n = bits.nextPow2(n)
+  var log_n = bits.log2(n)
+  var cache = DOUBLE[log_n]
+  if(cache.length > 0) {
+    return cache.pop()
+  }
+  return new Float64Array(n)
+}
+
+exports.mallocArrayBuffer = function mallocArrayBuffer(n) {
+  n = bits.nextPow2(n)
+  var log_n = bits.log2(n)
+  var cache = DATA[log_n]
+  if(cache.length > 0) {
+    return cache.pop()
+  }
+  return new ArrayBuffer(n)
+}
+
+if(hasUint8C) {
+  exports.mallocUint8Clamped = function mallocUint8Clamped(n) {
+    n = bits.nextPow2(n)
+    var log_n = bits.log2(n)
+    var cache = UINT8C[log_n]
+    if(cache.length > 0) {
+      return cache.pop()
+    }
+    return new Uint8ClampedArray(n)
+  }
+} else {
+  exports.mallocUint8Clamped = exports.mallocUint8
+}
+
+exports.mallocBuffer = function mallocBuffer(n) {
+  n = bits.nextPow2(n)
+  var log_n = bits.log2(n)
+  var cache = BUFFER[log_n]
+  if(cache.length > 0) {
+    return cache.pop()
+  }
+  return new Buffer(n)
+}
+
+exports.clearCache = function clearCache() {
+  for(var i=0; i<32; ++i) {
+    UINT8[i].length = 0
+    UINT16[i].length = 0
+    UINT32[i].length = 0
+    INT8[i].length = 0
+    INT16[i].length = 0
+    INT32[i].length = 0
+    FLOAT[i].length = 0
+    DOUBLE[i].length = 0
+    DATA[i].length = 0
+    UINT8C[i].length = 0
+    BUFFER[i].length = 0
+  }
+}
+})(self,require("__browserify_Buffer").Buffer)
+},{"dup":112,"bit-twiddle":113,"__browserify_Buffer":44}],92:[function(require,module,exports){
+"use strict"
+
+var compile = require("cwise-compiler")
+
+var EmptyProc = {
+  body: "",
+  args: [],
+  thisVars: [],
+  localVars: []
+}
+
+function fixup(x) {
+  if(!x) {
+    return EmptyProc
+  }
+  for(var i=0; i<x.args.length; ++i) {
+    var a = x.args[i]
+    if(i === 0) {
+      x.args[i] = {name: a, lvalue:true, rvalue: !!x.rvalue, count:x.count||1 }
+    } else {
+      x.args[i] = {name: a, lvalue:false, rvalue:true, count: 1}
+    }
+  }
+  if(!x.thisVars) {
+    x.thisVars = []
+  }
+  if(!x.localVars) {
+    x.localVars = []
+  }
+  return x
+}
+
+function pcompile(user_args) {
+  return compile({
+    args:     user_args.args,
+    pre:      fixup(user_args.pre),
+    body:     fixup(user_args.body),
+    post:     fixup(user_args.proc),
+    funcName: user_args.funcName
+  })
+}
+
+function makeOp(user_args) {
+  var args = []
+  for(var i=0; i<user_args.args.length; ++i) {
+    args.push("a"+i)
+  }
+  var wrapper = new Function("P", [
+    "return function ", user_args.funcName, "_ndarrayops(", args.join(","), ") {P(", args.join(","), ");return a0}"
+  ].join(""))
+  return wrapper(pcompile(user_args))
+}
+
+var assign_ops = {
+  add:  "+",
+  sub:  "-",
+  mul:  "*",
+  div:  "/",
+  mod:  "%",
+  band: "&",
+  bor:  "|",
+  bxor: "^",
+  lshift: "<<",
+  rshift: ">>",
+  rrshift: ">>>"
+}
+;(function(){
+  for(var id in assign_ops) {
+    var op = assign_ops[id]
+    exports[id] = makeOp({
+      args: ["array","array","array"],
+      body: {args:["a","b","c"],
+             body: "a=b"+op+"c"},
+      funcName: id
+    })
+    exports[id+"eq"] = makeOp({
+      args: ["array","array"],
+      body: {args:["a","b"],
+             body:"a"+op+"=b"},
+      rvalue: true,
+      funcName: id+"eq"
+    })
+    exports[id+"s"] = makeOp({
+      args: ["array", "array", "scalar"],
+      body: {args:["a","b","s"],
+             body:"a=b"+op+"s"},
+      funcName: id+"s"
+    })
+    exports[id+"seq"] = makeOp({
+      args: ["array","scalar"],
+      body: {args:["a","s"],
+             body:"a"+op+"=s"},
+      rvalue: true,
+      funcName: id+"seq"
+    })
+  }
+})();
+
+var unary_ops = {
+  not: "!",
+  bnot: "~",
+  neg: "-",
+  recip: "1.0/"
+}
+;(function(){
+  for(var id in unary_ops) {
+    var op = unary_ops[id]
+    exports[id] = makeOp({
+      args: ["array", "array"],
+      body: {args:["a","b"],
+             body:"a="+op+"b"},
+      funcName: id
+    })
+    exports[id+"eq"] = makeOp({
+      args: ["array"],
+      body: {args:["a"],
+             body:"a="+op+"a"},
+      rvalue: true,
+      count: 2,
+      funcName: id+"eq"
+    })
+  }
+})();
+
+var binary_ops = {
+  and: "&&",
+  or: "||",
+  eq: "===",
+  neq: "!==",
+  lt: "<",
+  gt: ">",
+  leq: "<=",
+  geq: ">="
+}
+;(function() {
+  for(var id in binary_ops) {
+    var op = binary_ops[id]
+    exports[id] = makeOp({
+      args: ["array","array","array"],
+      body: {args:["a", "b", "c"],
+             body:"a=b"+op+"c"},
+      funcName: id
+    })
+    exports[id+"s"] = makeOp({
+      args: ["array","array","scalar"],
+      body: {args:["a", "b", "s"],
+             body:"a=b"+op+"s"},
+      funcName: id+"s"
+    })
+    exports[id+"eq"] = makeOp({
+      args: ["array", "array"],
+      body: {args:["a", "b"],
+             body:"a=a"+op+"b"},
+      rvalue:true,
+      count:2,
+      funcName: id+"eq"
+    })
+    exports[id+"seq"] = makeOp({
+      args: ["array", "scalar"],
+      body: {args:["a","s"],
+             body:"a=a"+op+"s"},
+      rvalue:true,
+      count:2,
+      funcName: id+"seq"
+    })
+  }
+})();
+
+var math_unary = [
+  "abs",
+  "acos",
+  "asin",
+  "atan",
+  "ceil",
+  "cos",
+  "exp",
+  "floor",
+  "log",
+  "round",
+  "sin",
+  "sqrt",
+  "tan"
+]
+;(function() {
+  for(var i=0; i<math_unary.length; ++i) {
+    var f = math_unary[i]
+    exports[f] = makeOp({
+                    args: ["array", "array"],
+                    pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                    body: {args:["a","b"], body:"a=this_f(b)", thisVars:["this_f"]},
+                    funcName: f
+                  })
+    exports[f+"eq"] = makeOp({
+                      args: ["array"],
+                      pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                      body: {args: ["a"], body:"a=this_f(a)", thisVars:["this_f"]},
+                      rvalue: true,
+                      count: 2,
+                      funcName: f+"eq"
+                    })
+  }
+})();
+
+var math_comm = [
+  "max",
+  "min",
+  "atan2",
+  "pow"
+]
+;(function(){
+  for(var i=0; i<math_comm.length; ++i) {
+    var f= math_comm[i]
+    exports[f] = makeOp({
+                  args:["array", "array", "array"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b","c"], body:"a=this_f(b,c)", thisVars:["this_f"]},
+                  funcName: f
+                })
+    exports[f+"s"] = makeOp({
+                  args:["array", "array", "scalar"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b","c"], body:"a=this_f(b,c)", thisVars:["this_f"]},
+                  funcName: f+"s"
+                  })
+    exports[f+"eq"] = makeOp({ args:["array", "array"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b"], body:"a=this_f(a,b)", thisVars:["this_f"]},
+                  rvalue: true,
+                  count: 2,
+                  funcName: f+"eq"
+                  })
+    exports[f+"seq"] = makeOp({ args:["array", "scalar"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b"], body:"a=this_f(a,b)", thisVars:["this_f"]},
+                  rvalue:true,
+                  count:2,
+                  funcName: f+"seq"
+                  })
+  }
+})();
+
+var math_noncomm = [
+  "atan2",
+  "pow"
+]
+;(function(){
+  for(var i=0; i<math_noncomm.length; ++i) {
+    var f= math_noncomm[i]
+    exports[f+"op"] = makeOp({
+                  args:["array", "array", "array"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b","c"], body:"a=this_f(c,b)", thisVars:["this_f"]},
+                  funcName: f+"op"
+                })
+    exports[f+"ops"] = makeOp({
+                  args:["array", "array", "scalar"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b","c"], body:"a=this_f(c,b)", thisVars:["this_f"]},
+                  funcName: f+"ops"
+                  })
+    exports[f+"opeq"] = makeOp({ args:["array", "array"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b"], body:"a=this_f(b,a)", thisVars:["this_f"]},
+                  rvalue: true,
+                  count: 2,
+                  funcName: f+"opeq"
+                  })
+    exports[f+"opseq"] = makeOp({ args:["array", "scalar"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b"], body:"a=this_f(b,a)", thisVars:["this_f"]},
+                  rvalue:true,
+                  count:2,
+                  funcName: f+"opseq"
+                  })
+  }
+})();
+
+exports.any = compile({
+  args:["array"],
+  pre: EmptyProc,
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:1}], body: "if(a){return true}", localVars: [], thisVars: []},
+  post: {args:[], localVars:[], thisVars:[], body:"return false"},
+  funcName: "any"
+})
+
+exports.all = compile({
+  args:["array"],
+  pre: EmptyProc,
+  body: {args:[{name:"x", lvalue:false, rvalue:true, count:1}], body: "if(!x){return false}", localVars: [], thisVars: []},
+  post: {args:[], localVars:[], thisVars:[], body:"return true"},
+  funcName: "all"
+})
+
+exports.sum = compile({
+  args:["array"],
+  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:1}], body: "this_s+=a", localVars: [], thisVars: ["this_s"]},
+  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
+  funcName: "sum"
+})
+
+exports.prod = compile({
+  args:["array"],
+  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=1"},
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:1}], body: "this_s*=a", localVars: [], thisVars: ["this_s"]},
+  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
+  funcName: "prod"
+})
+
+exports.norm2squared = compile({
+  args:["array"],
+  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:2}], body: "this_s+=a*a", localVars: [], thisVars: ["this_s"]},
+  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
+  funcName: "norm2squared"
+})
+  
+exports.norm2 = compile({
+  args:["array"],
+  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:2}], body: "this_s+=a*a", localVars: [], thisVars: ["this_s"]},
+  post: {args:[], localVars:[], thisVars:["this_s"], body:"return Math.sqrt(this_s)"},
+  funcName: "norm2"
+})
+  
+
+exports.norminf = compile({
+  args:["array"],
+  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:4}], body:"if(-a>this_s){this_s=-a}else if(a>this_s){this_s=a}", localVars: [], thisVars: ["this_s"]},
+  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
+  funcName: "norminf"
+})
+
+exports.norm1 = compile({
+  args:["array"],
+  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:3}], body: "this_s+=a<0?-a:a", localVars: [], thisVars: ["this_s"]},
+  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
+  funcName: "norm1"
+})
+
+exports.sup = compile({
+  args: [ "array" ],
+  pre:
+   { body: "this_h=-Infinity",
+     args: [],
+     thisVars: [ "this_h" ],
+     localVars: [] },
+  body:
+   { body: "if(_inline_1_arg0_>this_h)this_h=_inline_1_arg0_",
+     args: [{"name":"_inline_1_arg0_","lvalue":false,"rvalue":true,"count":2} ],
+     thisVars: [ "this_h" ],
+     localVars: [] },
+  post:
+   { body: "return this_h",
+     args: [],
+     thisVars: [ "this_h" ],
+     localVars: [] }
+ })
+
+exports.inf = compile({
+  args: [ "array" ],
+  pre:
+   { body: "this_h=Infinity",
+     args: [],
+     thisVars: [ "this_h" ],
+     localVars: [] },
+  body:
+   { body: "if(_inline_1_arg0_<this_h)this_h=_inline_1_arg0_",
+     args: [{"name":"_inline_1_arg0_","lvalue":false,"rvalue":true,"count":2} ],
+     thisVars: [ "this_h" ],
+     localVars: [] },
+  post:
+   { body: "return this_h",
+     args: [],
+     thisVars: [ "this_h" ],
+     localVars: [] }
+ })
+
+exports.argmin = compile({
+  args:["index","array","shape"],
+  pre:{
+    body:"{this_v=Infinity;this_i=_inline_0_arg2_.slice(0)}",
+    args:[
+      {name:"_inline_0_arg0_",lvalue:false,rvalue:false,count:0},
+      {name:"_inline_0_arg1_",lvalue:false,rvalue:false,count:0},
+      {name:"_inline_0_arg2_",lvalue:false,rvalue:true,count:1}
+      ],
+    thisVars:["this_i","this_v"],
+    localVars:[]},
+  body:{
+    body:"{if(_inline_1_arg1_<this_v){this_v=_inline_1_arg1_;for(var _inline_1_k=0;_inline_1_k<_inline_1_arg0_.length;++_inline_1_k){this_i[_inline_1_k]=_inline_1_arg0_[_inline_1_k]}}}",
+    args:[
+      {name:"_inline_1_arg0_",lvalue:false,rvalue:true,count:2},
+      {name:"_inline_1_arg1_",lvalue:false,rvalue:true,count:2}],
+    thisVars:["this_i","this_v"],
+    localVars:["_inline_1_k"]},
+  post:{
+    body:"{return this_i}",
+    args:[],
+    thisVars:["this_i"],
+    localVars:[]}
+})
+
+exports.argmax = compile({
+  args:["index","array","shape"],
+  pre:{
+    body:"{this_v=-Infinity;this_i=_inline_0_arg2_.slice(0)}",
+    args:[
+      {name:"_inline_0_arg0_",lvalue:false,rvalue:false,count:0},
+      {name:"_inline_0_arg1_",lvalue:false,rvalue:false,count:0},
+      {name:"_inline_0_arg2_",lvalue:false,rvalue:true,count:1}
+      ],
+    thisVars:["this_i","this_v"],
+    localVars:[]},
+  body:{
+    body:"{if(_inline_1_arg1_>this_v){this_v=_inline_1_arg1_;for(var _inline_1_k=0;_inline_1_k<_inline_1_arg0_.length;++_inline_1_k){this_i[_inline_1_k]=_inline_1_arg0_[_inline_1_k]}}}",
+    args:[
+      {name:"_inline_1_arg0_",lvalue:false,rvalue:true,count:2},
+      {name:"_inline_1_arg1_",lvalue:false,rvalue:true,count:2}],
+    thisVars:["this_i","this_v"],
+    localVars:["_inline_1_k"]},
+  post:{
+    body:"{return this_i}",
+    args:[],
+    thisVars:["this_i"],
+    localVars:[]}
+})  
+
+exports.random = makeOp({
+  args: ["array"],
+  pre: {args:[], body:"this_f=Math.random", thisVars:["this_f"]},
+  body: {args: ["a"], body:"a=this_f()", thisVars:["this_f"]},
+  funcName: "random"
+})
+
+exports.assign = makeOp({
+  args:["array", "array"],
+  body: {args:["a", "b"], body:"a=b"},
+  funcName: "assign" })
+
+exports.assigns = makeOp({
+  args:["array", "scalar"],
+  body: {args:["a", "b"], body:"a=b"},
+  funcName: "assigns" })
+
+
+exports.equals = compile({
+  args:["array", "array"],
+  pre: EmptyProc,
+  body: {args:[{name:"x", lvalue:false, rvalue:true, count:1},
+               {name:"y", lvalue:false, rvalue:true, count:1}], 
+        body: "if(x!==y){return false}", 
+        localVars: [], 
+        thisVars: []},
+  post: {args:[], localVars:[], thisVars:[], body:"return true"},
+  funcName: "equals"
+})
+
+
+
+},{"cwise-compiler":114}],99:[function(require,module,exports){
 "use strict"
 
 var bisect = require("bisect")
@@ -17509,7 +18421,7 @@ module.exports = function phase2_p(array, nrows, ncols, s, t, p) {
     }
   }
 }
-},{"bisect":110}],92:[function(require,module,exports){
+},{"bisect":115}],98:[function(require,module,exports){
 "use strict"
 
 var compile = require("cwise-compiler")
@@ -17972,7 +18884,7 @@ exports.equals = compile({
 
 
 
-},{"cwise-compiler":111}],93:[function(require,module,exports){
+},{"cwise-compiler":116}],97:[function(require,module,exports){
 (function(global,Buffer){var bits = require("bit-twiddle")
 var dup = require("dup")
 if(!global.__TYPEDARRAY_POOL) {
@@ -18341,7 +19253,7 @@ exports.clearCache = function clearCache() {
   }
 }
 })(self,require("__browserify_Buffer").Buffer)
-},{"dup":112,"bit-twiddle":113,"__browserify_Buffer":40}],94:[function(require,module,exports){
+},{"dup":117,"bit-twiddle":118,"__browserify_Buffer":44}],96:[function(require,module,exports){
 "use strict";
 
 var weakMap = typeof WeakMap === "undefined" ? require("weakmap") : WeakMap
@@ -18378,913 +19290,7 @@ function initWebGLEW(gl) {
   return extensions
 }
 module.exports = initWebGLEW
-},{"weakmap":114}],82:[function(require,module,exports){
-"use strict";
-
-var weakMap = typeof WeakMap === "undefined" ? require("weakmap") : WeakMap
-
-var WebGLEWStruct = new weakMap()
-
-function baseName(ext_name) {
-  return ext_name.replace(/^[A-Z]+_/, "")
-}
-
-function initWebGLEW(gl) {
-  var struct = WebGLEWStruct.get(gl)
-  if(struct) {
-    return struct
-  }
-  var extensions = {}
-  var supported = gl.getSupportedExtensions()
-  for(var i=0; i<supported.length; ++i) {
-    var extName = supported[i]
-    var ext = gl.getExtension(supported[i])
-    if(!ext) {
-      continue
-    }
-    while(true) {
-      extensions[extName] = ext
-      var base = baseName(extName)
-      if(base === extName) {
-        break
-      }
-      extName = base
-    }
-  }
-  WebGLEWStruct.set(gl, extensions)
-  return extensions
-}
-module.exports = initWebGLEW
-},{"weakmap":115}],95:[function(require,module,exports){
-(function(global,Buffer){var bits = require("bit-twiddle")
-var dup = require("dup")
-if(!global.__TYPEDARRAY_POOL) {
-  global.__TYPEDARRAY_POOL = {
-      UINT8   : dup([32, 0])
-    , UINT16  : dup([32, 0])
-    , UINT32  : dup([32, 0])
-    , INT8    : dup([32, 0])
-    , INT16   : dup([32, 0])
-    , INT32   : dup([32, 0])
-    , FLOAT   : dup([32, 0])
-    , DOUBLE  : dup([32, 0])
-    , DATA    : dup([32, 0])
-    , UINT8C  : dup([32, 0])
-    , BUFFER  : dup([32, 0])
-  }
-}
-var hasUint8C = (typeof Uint8ClampedArray) !== "undefined"
-var POOL = global.__TYPEDARRAY_POOL
-if(!POOL.UINT8C) {
-  POOL.UINT8C = dup([32, 0])
-}
-if(!POOL.BUFFER) {
-  POOL.BUFFER = dup([32, 0])
-}
-var UINT8   = POOL.UINT8
-  , UINT16  = POOL.UINT16
-  , UINT32  = POOL.UINT32
-  , INT8    = POOL.INT8
-  , INT16   = POOL.INT16
-  , INT32   = POOL.INT32
-  , FLOAT   = POOL.FLOAT
-  , DOUBLE  = POOL.DOUBLE
-  , DATA    = POOL.DATA
-  , UINT8C  = POOL.UINT8C
-  , BUFFER  = POOL.BUFFER
-
-exports.free = function free(array) {
-  var n = array.length|0
-    , log_n = bits.log2(n)
-  if(Buffer.isBuffer(array)) {
-    BUFFER[log_n].push(array)
-  } else {
-    switch(Object.prototype.toString.call(array)) {
-      case "[object Uint8Array]":
-        UINT8[log_n].push(array)
-      break
-      case "[object Uint16Array]":
-        UINT16[log_n].push(array)
-      break
-      case "[object Uint32Array]":
-        UINT32[log_n].push(array)
-      break
-      case "[object Int8Array]":
-        INT8[log_n].push(array)
-      break
-      case "[object Int16Array]":
-        INT16[log_n].push(array)
-      break
-      case "[object Int32Array]":
-        INT32[log_n].push(array)
-      break
-      case "[object Uint8ClampedArray]":
-        UINT8C[log_n].push(array)
-      break
-      case "[object Float32Array]":
-        FLOAT[log_n].push(array)
-      break
-      case "[object Float64Array]":
-        DOUBLE[log_n].push(array)
-      break
-      case "[object ArrayBuffer]":
-        DATA[log_n].push(array)
-      break
-      default:
-        throw new Error("typedarray-pool: Unspecified array type")
-    }
-  }
-}
-
-exports.freeUint8 = function freeUint8(array) {
-  UINT8[bits.log2(array.length)].push(array)
-}
-
-exports.freeUint16 = function freeUint16(array) {
-  UINT16[bits.log2(array.length)].push(array)
-}
-
-exports.freeUint32 = function freeUint32(array) {
-  UINT32[bits.log2(array.length)].push(array)
-}
-
-exports.freeInt8 = function freeInt8(array) {
-  INT8[bits.log2(array.length)].push(array)
-}
-
-exports.freeInt16 = function freeInt16(array) {
-  INT16[bits.log2(array.length)].push(array)
-}
-
-exports.freeInt32 = function freeInt32(array) {
-  INT32[bits.log2(array.length)].push(array)
-}
-
-exports.freeFloat32 = exports.freeFloat = function freeFloat(array) {
-  FLOAT[bits.log2(array.length)].push(array)
-}
-
-exports.freeFloat64 = exports.freeDouble = function freeDouble(array) {
-  DOUBLE[bits.log2(array.length)].push(array)
-}
-
-exports.freeArrayBuffer = function freeArrayBuffer(array) {
-  DATA[bits.log2(array.length)].push(array)
-}
-
-if(hasUint8C) {
-  exports.freeUint8Clamped = function freeUint8Clamped(array) {
-    UINT8C[bits.log2(array.length)].push(array)
-  }
-} else {
-  exports.freeUint8Clamped = exports.freeUint8
-}
-
-exports.freeBuffer = function freeBuffer(array) {
-  BUFFER[bits.log2(array.length)].push(array)
-}
-
-exports.malloc = function malloc(n, dtype) {
-  n = bits.nextPow2(n)
-  var log_n = bits.log2(n)
-  if(dtype === undefined || dtype === "arraybuffer") {
-    var d = DATA[log_n]
-    if(d.length > 0) {
-      var r = d[d.length-1]
-      d.pop()
-      return r
-    }
-    return new ArrayBuffer(n)
-  } else {
-    switch(dtype) {
-      case "uint8":
-        var u8 = UINT8[log_n]
-        if(u8.length > 0) {
-          return u8.pop()
-        }
-        return new Uint8Array(n)
-      break
-
-      case "uint16":
-        var u16 = UINT16[log_n]
-        if(u16.length > 0) {
-          return u16.pop()
-        }
-        return new Uint16Array(n)
-      break
-
-      case "uint32":
-        var u32 = UINT32[log_n]
-        if(u32.length > 0) {
-          return u32.pop()
-        }
-        return new Uint32Array(n)
-      break
-
-      case "int8":
-        var i8 = INT8[log_n]
-        if(i8.length > 0) {
-          return i8.pop()
-        }
-        return new Int8Array(n)
-      break
-
-      case "int16":
-        var i16 = INT16[log_n]
-        if(i16.length > 0) {
-          return i16.pop()
-        }
-        return new Int16Array(n)
-      break
-
-      case "int32":
-        var i32 = INT32[log_n]
-        if(i32.length > 0) {
-          return i32.pop()
-        }
-        return new Int32Array(n)
-      break
-
-      case "float":
-      case "float32":
-        var f = FLOAT[log_n]
-        if(f.length > 0) {
-          return f.pop()
-        }
-        return new Float32Array(n)
-      break
-
-      case "double":
-      case "float64":
-        var dd = DOUBLE[log_n]
-        if(dd.length > 0) {
-          return dd.pop()
-        }
-        return new Float64Array(n)
-      break
-
-      case "uint8_clamped":
-        if(hasUint8C) {
-          var u8c = UINT8C[log_n]
-          if(u8c.length > 0) {
-            return u8c.pop()
-          }
-          return new Uint8ClampedArray(n)
-        } else {
-          var u8 = UINT8[log_n]
-          if(u8.length > 0) {
-            return u8.pop()
-          }
-          return new Uint8Array(n)
-        }
-      break
-
-      case "buffer":
-        var buf = BUFFER[log_n]
-        if(buf.length > 0) {
-          return buf.pop()
-        }
-        return new Buffer(n)
-      break
-
-      default:
-        return null
-    }
-  }
-  return null
-}
-
-exports.mallocUint8 = function mallocUint8(n) {
-  n = bits.nextPow2(n)
-  var log_n = bits.log2(n)
-  var cache = UINT8[log_n]
-  if(cache.length > 0) {
-    return cache.pop()
-  }
-  return new Uint8Array(n)
-}
-
-exports.mallocUint16 = function mallocUint16(n) {
-  n = bits.nextPow2(n)
-  var log_n = bits.log2(n)
-  var cache = UINT16[log_n]
-  if(cache.length > 0) {
-    return cache.pop()
-  }
-  return new Uint16Array(n)
-}
-
-exports.mallocUint32 = function mallocUint32(n) {
-  n = bits.nextPow2(n)
-  var log_n = bits.log2(n)
-  var cache = UINT32[log_n]
-  if(cache.length > 0) {
-    return cache.pop()
-  }
-  return new Uint32Array(n)
-}
-
-exports.mallocInt8 = function mallocInt8(n) {
-  n = bits.nextPow2(n)
-  var log_n = bits.log2(n)
-  var cache = INT8[log_n]
-  if(cache.length > 0) {
-    return cache.pop()
-  }
-  return new Int8Array(n)
-}
-
-exports.mallocInt16 = function mallocInt16(n) {
-  n = bits.nextPow2(n)
-  var log_n = bits.log2(n)
-  var cache = INT16[log_n]
-  if(cache.length > 0) {
-    return cache.pop()
-  }
-  return new Int16Array(n)
-}
-
-exports.mallocInt32 = function mallocInt32(n) {
-  n = bits.nextPow2(n)
-  var log_n = bits.log2(n)
-  var cache = INT32[log_n]
-  if(cache.length > 0) {
-    return cache.pop()
-  }
-  return new Int32Array(n)
-}
-
-exports.mallocFloat32 = exports.mallocFloat = function mallocFloat(n) {
-  n = bits.nextPow2(n)
-  var log_n = bits.log2(n)
-  var cache = FLOAT[log_n]
-  if(cache.length > 0) {
-    return cache.pop()
-  }
-  return new Float32Array(n)
-}
-
-exports.mallocFloat64 = exports.mallocDouble = function mallocDouble(n) {
-  n = bits.nextPow2(n)
-  var log_n = bits.log2(n)
-  var cache = DOUBLE[log_n]
-  if(cache.length > 0) {
-    return cache.pop()
-  }
-  return new Float64Array(n)
-}
-
-exports.mallocArrayBuffer = function mallocArrayBuffer(n) {
-  n = bits.nextPow2(n)
-  var log_n = bits.log2(n)
-  var cache = DATA[log_n]
-  if(cache.length > 0) {
-    return cache.pop()
-  }
-  return new ArrayBuffer(n)
-}
-
-if(hasUint8C) {
-  exports.mallocUint8Clamped = function mallocUint8Clamped(n) {
-    n = bits.nextPow2(n)
-    var log_n = bits.log2(n)
-    var cache = UINT8C[log_n]
-    if(cache.length > 0) {
-      return cache.pop()
-    }
-    return new Uint8ClampedArray(n)
-  }
-} else {
-  exports.mallocUint8Clamped = exports.mallocUint8
-}
-
-exports.mallocBuffer = function mallocBuffer(n) {
-  n = bits.nextPow2(n)
-  var log_n = bits.log2(n)
-  var cache = BUFFER[log_n]
-  if(cache.length > 0) {
-    return cache.pop()
-  }
-  return new Buffer(n)
-}
-
-exports.clearCache = function clearCache() {
-  for(var i=0; i<32; ++i) {
-    UINT8[i].length = 0
-    UINT16[i].length = 0
-    UINT32[i].length = 0
-    INT8[i].length = 0
-    INT16[i].length = 0
-    INT32[i].length = 0
-    FLOAT[i].length = 0
-    DOUBLE[i].length = 0
-    DATA[i].length = 0
-    UINT8C[i].length = 0
-    BUFFER[i].length = 0
-  }
-}
-})(self,require("__browserify_Buffer").Buffer)
-},{"bit-twiddle":116,"dup":117,"__browserify_Buffer":40}],96:[function(require,module,exports){
-"use strict"
-
-var compile = require("cwise-compiler")
-
-var EmptyProc = {
-  body: "",
-  args: [],
-  thisVars: [],
-  localVars: []
-}
-
-function fixup(x) {
-  if(!x) {
-    return EmptyProc
-  }
-  for(var i=0; i<x.args.length; ++i) {
-    var a = x.args[i]
-    if(i === 0) {
-      x.args[i] = {name: a, lvalue:true, rvalue: !!x.rvalue, count:x.count||1 }
-    } else {
-      x.args[i] = {name: a, lvalue:false, rvalue:true, count: 1}
-    }
-  }
-  if(!x.thisVars) {
-    x.thisVars = []
-  }
-  if(!x.localVars) {
-    x.localVars = []
-  }
-  return x
-}
-
-function pcompile(user_args) {
-  return compile({
-    args:     user_args.args,
-    pre:      fixup(user_args.pre),
-    body:     fixup(user_args.body),
-    post:     fixup(user_args.proc),
-    funcName: user_args.funcName
-  })
-}
-
-function makeOp(user_args) {
-  var args = []
-  for(var i=0; i<user_args.args.length; ++i) {
-    args.push("a"+i)
-  }
-  var wrapper = new Function("P", [
-    "return function ", user_args.funcName, "_ndarrayops(", args.join(","), ") {P(", args.join(","), ");return a0}"
-  ].join(""))
-  return wrapper(pcompile(user_args))
-}
-
-var assign_ops = {
-  add:  "+",
-  sub:  "-",
-  mul:  "*",
-  div:  "/",
-  mod:  "%",
-  band: "&",
-  bor:  "|",
-  bxor: "^",
-  lshift: "<<",
-  rshift: ">>",
-  rrshift: ">>>"
-}
-;(function(){
-  for(var id in assign_ops) {
-    var op = assign_ops[id]
-    exports[id] = makeOp({
-      args: ["array","array","array"],
-      body: {args:["a","b","c"],
-             body: "a=b"+op+"c"},
-      funcName: id
-    })
-    exports[id+"eq"] = makeOp({
-      args: ["array","array"],
-      body: {args:["a","b"],
-             body:"a"+op+"=b"},
-      rvalue: true,
-      funcName: id+"eq"
-    })
-    exports[id+"s"] = makeOp({
-      args: ["array", "array", "scalar"],
-      body: {args:["a","b","s"],
-             body:"a=b"+op+"s"},
-      funcName: id+"s"
-    })
-    exports[id+"seq"] = makeOp({
-      args: ["array","scalar"],
-      body: {args:["a","s"],
-             body:"a"+op+"=s"},
-      rvalue: true,
-      funcName: id+"seq"
-    })
-  }
-})();
-
-var unary_ops = {
-  not: "!",
-  bnot: "~",
-  neg: "-",
-  recip: "1.0/"
-}
-;(function(){
-  for(var id in unary_ops) {
-    var op = unary_ops[id]
-    exports[id] = makeOp({
-      args: ["array", "array"],
-      body: {args:["a","b"],
-             body:"a="+op+"b"},
-      funcName: id
-    })
-    exports[id+"eq"] = makeOp({
-      args: ["array"],
-      body: {args:["a"],
-             body:"a="+op+"a"},
-      rvalue: true,
-      count: 2,
-      funcName: id+"eq"
-    })
-  }
-})();
-
-var binary_ops = {
-  and: "&&",
-  or: "||",
-  eq: "===",
-  neq: "!==",
-  lt: "<",
-  gt: ">",
-  leq: "<=",
-  geq: ">="
-}
-;(function() {
-  for(var id in binary_ops) {
-    var op = binary_ops[id]
-    exports[id] = makeOp({
-      args: ["array","array","array"],
-      body: {args:["a", "b", "c"],
-             body:"a=b"+op+"c"},
-      funcName: id
-    })
-    exports[id+"s"] = makeOp({
-      args: ["array","array","scalar"],
-      body: {args:["a", "b", "s"],
-             body:"a=b"+op+"s"},
-      funcName: id+"s"
-    })
-    exports[id+"eq"] = makeOp({
-      args: ["array", "array"],
-      body: {args:["a", "b"],
-             body:"a=a"+op+"b"},
-      rvalue:true,
-      count:2,
-      funcName: id+"eq"
-    })
-    exports[id+"seq"] = makeOp({
-      args: ["array", "scalar"],
-      body: {args:["a","s"],
-             body:"a=a"+op+"s"},
-      rvalue:true,
-      count:2,
-      funcName: id+"seq"
-    })
-  }
-})();
-
-var math_unary = [
-  "abs",
-  "acos",
-  "asin",
-  "atan",
-  "ceil",
-  "cos",
-  "exp",
-  "floor",
-  "log",
-  "round",
-  "sin",
-  "sqrt",
-  "tan"
-]
-;(function() {
-  for(var i=0; i<math_unary.length; ++i) {
-    var f = math_unary[i]
-    exports[f] = makeOp({
-                    args: ["array", "array"],
-                    pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                    body: {args:["a","b"], body:"a=this_f(b)", thisVars:["this_f"]},
-                    funcName: f
-                  })
-    exports[f+"eq"] = makeOp({
-                      args: ["array"],
-                      pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                      body: {args: ["a"], body:"a=this_f(a)", thisVars:["this_f"]},
-                      rvalue: true,
-                      count: 2,
-                      funcName: f+"eq"
-                    })
-  }
-})();
-
-var math_comm = [
-  "max",
-  "min",
-  "atan2",
-  "pow"
-]
-;(function(){
-  for(var i=0; i<math_comm.length; ++i) {
-    var f= math_comm[i]
-    exports[f] = makeOp({
-                  args:["array", "array", "array"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b","c"], body:"a=this_f(b,c)", thisVars:["this_f"]},
-                  funcName: f
-                })
-    exports[f+"s"] = makeOp({
-                  args:["array", "array", "scalar"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b","c"], body:"a=this_f(b,c)", thisVars:["this_f"]},
-                  funcName: f+"s"
-                  })
-    exports[f+"eq"] = makeOp({ args:["array", "array"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b"], body:"a=this_f(a,b)", thisVars:["this_f"]},
-                  rvalue: true,
-                  count: 2,
-                  funcName: f+"eq"
-                  })
-    exports[f+"seq"] = makeOp({ args:["array", "scalar"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b"], body:"a=this_f(a,b)", thisVars:["this_f"]},
-                  rvalue:true,
-                  count:2,
-                  funcName: f+"seq"
-                  })
-  }
-})();
-
-var math_noncomm = [
-  "atan2",
-  "pow"
-]
-;(function(){
-  for(var i=0; i<math_noncomm.length; ++i) {
-    var f= math_noncomm[i]
-    exports[f+"op"] = makeOp({
-                  args:["array", "array", "array"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b","c"], body:"a=this_f(c,b)", thisVars:["this_f"]},
-                  funcName: f+"op"
-                })
-    exports[f+"ops"] = makeOp({
-                  args:["array", "array", "scalar"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b","c"], body:"a=this_f(c,b)", thisVars:["this_f"]},
-                  funcName: f+"ops"
-                  })
-    exports[f+"opeq"] = makeOp({ args:["array", "array"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b"], body:"a=this_f(b,a)", thisVars:["this_f"]},
-                  rvalue: true,
-                  count: 2,
-                  funcName: f+"opeq"
-                  })
-    exports[f+"opseq"] = makeOp({ args:["array", "scalar"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b"], body:"a=this_f(b,a)", thisVars:["this_f"]},
-                  rvalue:true,
-                  count:2,
-                  funcName: f+"opseq"
-                  })
-  }
-})();
-
-exports.any = compile({
-  args:["array"],
-  pre: EmptyProc,
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:1}], body: "if(a){return true}", localVars: [], thisVars: []},
-  post: {args:[], localVars:[], thisVars:[], body:"return false"},
-  funcName: "any"
-})
-
-exports.all = compile({
-  args:["array"],
-  pre: EmptyProc,
-  body: {args:[{name:"x", lvalue:false, rvalue:true, count:1}], body: "if(!x){return false}", localVars: [], thisVars: []},
-  post: {args:[], localVars:[], thisVars:[], body:"return true"},
-  funcName: "all"
-})
-
-exports.sum = compile({
-  args:["array"],
-  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:1}], body: "this_s+=a", localVars: [], thisVars: ["this_s"]},
-  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
-  funcName: "sum"
-})
-
-exports.prod = compile({
-  args:["array"],
-  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=1"},
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:1}], body: "this_s*=a", localVars: [], thisVars: ["this_s"]},
-  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
-  funcName: "prod"
-})
-
-exports.norm2squared = compile({
-  args:["array"],
-  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:2}], body: "this_s+=a*a", localVars: [], thisVars: ["this_s"]},
-  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
-  funcName: "norm2squared"
-})
-  
-exports.norm2 = compile({
-  args:["array"],
-  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:2}], body: "this_s+=a*a", localVars: [], thisVars: ["this_s"]},
-  post: {args:[], localVars:[], thisVars:["this_s"], body:"return Math.sqrt(this_s)"},
-  funcName: "norm2"
-})
-  
-
-exports.norminf = compile({
-  args:["array"],
-  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:4}], body:"if(-a>this_s){this_s=-a}else if(a>this_s){this_s=a}", localVars: [], thisVars: ["this_s"]},
-  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
-  funcName: "norminf"
-})
-
-exports.norm1 = compile({
-  args:["array"],
-  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:3}], body: "this_s+=a<0?-a:a", localVars: [], thisVars: ["this_s"]},
-  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
-  funcName: "norm1"
-})
-
-exports.sup = compile({
-  args: [ "array" ],
-  pre:
-   { body: "this_h=-Infinity",
-     args: [],
-     thisVars: [ "this_h" ],
-     localVars: [] },
-  body:
-   { body: "if(_inline_1_arg0_>this_h)this_h=_inline_1_arg0_",
-     args: [{"name":"_inline_1_arg0_","lvalue":false,"rvalue":true,"count":2} ],
-     thisVars: [ "this_h" ],
-     localVars: [] },
-  post:
-   { body: "return this_h",
-     args: [],
-     thisVars: [ "this_h" ],
-     localVars: [] }
- })
-
-exports.inf = compile({
-  args: [ "array" ],
-  pre:
-   { body: "this_h=Infinity",
-     args: [],
-     thisVars: [ "this_h" ],
-     localVars: [] },
-  body:
-   { body: "if(_inline_1_arg0_<this_h)this_h=_inline_1_arg0_",
-     args: [{"name":"_inline_1_arg0_","lvalue":false,"rvalue":true,"count":2} ],
-     thisVars: [ "this_h" ],
-     localVars: [] },
-  post:
-   { body: "return this_h",
-     args: [],
-     thisVars: [ "this_h" ],
-     localVars: [] }
- })
-
-exports.argmin = compile({
-  args:["index","array","shape"],
-  pre:{
-    body:"{this_v=Infinity;this_i=_inline_0_arg2_.slice(0)}",
-    args:[
-      {name:"_inline_0_arg0_",lvalue:false,rvalue:false,count:0},
-      {name:"_inline_0_arg1_",lvalue:false,rvalue:false,count:0},
-      {name:"_inline_0_arg2_",lvalue:false,rvalue:true,count:1}
-      ],
-    thisVars:["this_i","this_v"],
-    localVars:[]},
-  body:{
-    body:"{if(_inline_1_arg1_<this_v){this_v=_inline_1_arg1_;for(var _inline_1_k=0;_inline_1_k<_inline_1_arg0_.length;++_inline_1_k){this_i[_inline_1_k]=_inline_1_arg0_[_inline_1_k]}}}",
-    args:[
-      {name:"_inline_1_arg0_",lvalue:false,rvalue:true,count:2},
-      {name:"_inline_1_arg1_",lvalue:false,rvalue:true,count:2}],
-    thisVars:["this_i","this_v"],
-    localVars:["_inline_1_k"]},
-  post:{
-    body:"{return this_i}",
-    args:[],
-    thisVars:["this_i"],
-    localVars:[]}
-})
-
-exports.argmax = compile({
-  args:["index","array","shape"],
-  pre:{
-    body:"{this_v=-Infinity;this_i=_inline_0_arg2_.slice(0)}",
-    args:[
-      {name:"_inline_0_arg0_",lvalue:false,rvalue:false,count:0},
-      {name:"_inline_0_arg1_",lvalue:false,rvalue:false,count:0},
-      {name:"_inline_0_arg2_",lvalue:false,rvalue:true,count:1}
-      ],
-    thisVars:["this_i","this_v"],
-    localVars:[]},
-  body:{
-    body:"{if(_inline_1_arg1_>this_v){this_v=_inline_1_arg1_;for(var _inline_1_k=0;_inline_1_k<_inline_1_arg0_.length;++_inline_1_k){this_i[_inline_1_k]=_inline_1_arg0_[_inline_1_k]}}}",
-    args:[
-      {name:"_inline_1_arg0_",lvalue:false,rvalue:true,count:2},
-      {name:"_inline_1_arg1_",lvalue:false,rvalue:true,count:2}],
-    thisVars:["this_i","this_v"],
-    localVars:["_inline_1_k"]},
-  post:{
-    body:"{return this_i}",
-    args:[],
-    thisVars:["this_i"],
-    localVars:[]}
-})  
-
-exports.random = makeOp({
-  args: ["array"],
-  pre: {args:[], body:"this_f=Math.random", thisVars:["this_f"]},
-  body: {args: ["a"], body:"a=this_f()", thisVars:["this_f"]},
-  funcName: "random"
-})
-
-exports.assign = makeOp({
-  args:["array", "array"],
-  body: {args:["a", "b"], body:"a=b"},
-  funcName: "assign" })
-
-exports.assigns = makeOp({
-  args:["array", "scalar"],
-  body: {args:["a", "b"], body:"a=b"},
-  funcName: "assigns" })
-
-
-exports.equals = compile({
-  args:["array", "array"],
-  pre: EmptyProc,
-  body: {args:[{name:"x", lvalue:false, rvalue:true, count:1},
-               {name:"y", lvalue:false, rvalue:true, count:1}], 
-        body: "if(x!==y){return false}", 
-        localVars: [], 
-        thisVars: []},
-  post: {args:[], localVars:[], thisVars:[], body:"return true"},
-  funcName: "equals"
-})
-
-
-
-},{"cwise-compiler":118}],97:[function(require,module,exports){
-"use strict";
-
-var weakMap = typeof WeakMap === "undefined" ? require("weakmap") : WeakMap
-
-var WebGLEWStruct = new weakMap()
-
-function baseName(ext_name) {
-  return ext_name.replace(/^[A-Z]+_/, "")
-}
-
-function initWebGLEW(gl) {
-  var struct = WebGLEWStruct.get(gl)
-  if(struct) {
-    return struct
-  }
-  var extensions = {}
-  var supported = gl.getSupportedExtensions()
-  for(var i=0; i<supported.length; ++i) {
-    var extName = supported[i]
-    var ext = gl.getExtension(supported[i])
-    if(!ext) {
-      continue
-    }
-    while(true) {
-      extensions[extName] = ext
-      var base = baseName(extName)
-      if(base === extName) {
-        break
-      }
-      extName = base
-    }
-  }
-  WebGLEWStruct.set(gl, extensions)
-  return extensions
-}
-module.exports = initWebGLEW
-},{"weakmap":119}],99:[function(require,module,exports){
+},{"weakmap":119}],100:[function(require,module,exports){
 "use strict"
 
 var parse   = require("cwise-parser")
@@ -19321,456 +19327,7 @@ function createCWise(user_args) {
 
 module.exports = createCWise
 
-},{"cwise-parser":120,"cwise-compiler":121}],100:[function(require,module,exports){
-"use strict"
-
-var compile = require("cwise-compiler")
-
-var EmptyProc = {
-  body: "",
-  args: [],
-  thisVars: [],
-  localVars: []
-}
-
-function fixup(x) {
-  if(!x) {
-    return EmptyProc
-  }
-  for(var i=0; i<x.args.length; ++i) {
-    var a = x.args[i]
-    if(i === 0) {
-      x.args[i] = {name: a, lvalue:true, rvalue: !!x.rvalue, count:x.count||1 }
-    } else {
-      x.args[i] = {name: a, lvalue:false, rvalue:true, count: 1}
-    }
-  }
-  if(!x.thisVars) {
-    x.thisVars = []
-  }
-  if(!x.localVars) {
-    x.localVars = []
-  }
-  return x
-}
-
-function pcompile(user_args) {
-  return compile({
-    args:     user_args.args,
-    pre:      fixup(user_args.pre),
-    body:     fixup(user_args.body),
-    post:     fixup(user_args.proc),
-    funcName: user_args.funcName
-  })
-}
-
-function makeOp(user_args) {
-  var args = []
-  for(var i=0; i<user_args.args.length; ++i) {
-    args.push("a"+i)
-  }
-  var wrapper = new Function("P", [
-    "return function ", user_args.funcName, "_ndarrayops(", args.join(","), ") {P(", args.join(","), ");return a0}"
-  ].join(""))
-  return wrapper(pcompile(user_args))
-}
-
-var assign_ops = {
-  add:  "+",
-  sub:  "-",
-  mul:  "*",
-  div:  "/",
-  mod:  "%",
-  band: "&",
-  bor:  "|",
-  bxor: "^",
-  lshift: "<<",
-  rshift: ">>",
-  rrshift: ">>>"
-}
-;(function(){
-  for(var id in assign_ops) {
-    var op = assign_ops[id]
-    exports[id] = makeOp({
-      args: ["array","array","array"],
-      body: {args:["a","b","c"],
-             body: "a=b"+op+"c"},
-      funcName: id
-    })
-    exports[id+"eq"] = makeOp({
-      args: ["array","array"],
-      body: {args:["a","b"],
-             body:"a"+op+"=b"},
-      rvalue: true,
-      funcName: id+"eq"
-    })
-    exports[id+"s"] = makeOp({
-      args: ["array", "array", "scalar"],
-      body: {args:["a","b","s"],
-             body:"a=b"+op+"s"},
-      funcName: id+"s"
-    })
-    exports[id+"seq"] = makeOp({
-      args: ["array","scalar"],
-      body: {args:["a","s"],
-             body:"a"+op+"=s"},
-      rvalue: true,
-      funcName: id+"seq"
-    })
-  }
-})();
-
-var unary_ops = {
-  not: "!",
-  bnot: "~",
-  neg: "-",
-  recip: "1.0/"
-}
-;(function(){
-  for(var id in unary_ops) {
-    var op = unary_ops[id]
-    exports[id] = makeOp({
-      args: ["array", "array"],
-      body: {args:["a","b"],
-             body:"a="+op+"b"},
-      funcName: id
-    })
-    exports[id+"eq"] = makeOp({
-      args: ["array"],
-      body: {args:["a"],
-             body:"a="+op+"a"},
-      rvalue: true,
-      count: 2,
-      funcName: id+"eq"
-    })
-  }
-})();
-
-var binary_ops = {
-  and: "&&",
-  or: "||",
-  eq: "===",
-  neq: "!==",
-  lt: "<",
-  gt: ">",
-  leq: "<=",
-  geq: ">="
-}
-;(function() {
-  for(var id in binary_ops) {
-    var op = binary_ops[id]
-    exports[id] = makeOp({
-      args: ["array","array","array"],
-      body: {args:["a", "b", "c"],
-             body:"a=b"+op+"c"},
-      funcName: id
-    })
-    exports[id+"s"] = makeOp({
-      args: ["array","array","scalar"],
-      body: {args:["a", "b", "s"],
-             body:"a=b"+op+"s"},
-      funcName: id+"s"
-    })
-    exports[id+"eq"] = makeOp({
-      args: ["array", "array"],
-      body: {args:["a", "b"],
-             body:"a=a"+op+"b"},
-      rvalue:true,
-      count:2,
-      funcName: id+"eq"
-    })
-    exports[id+"seq"] = makeOp({
-      args: ["array", "scalar"],
-      body: {args:["a","s"],
-             body:"a=a"+op+"s"},
-      rvalue:true,
-      count:2,
-      funcName: id+"seq"
-    })
-  }
-})();
-
-var math_unary = [
-  "abs",
-  "acos",
-  "asin",
-  "atan",
-  "ceil",
-  "cos",
-  "exp",
-  "floor",
-  "log",
-  "round",
-  "sin",
-  "sqrt",
-  "tan"
-]
-;(function() {
-  for(var i=0; i<math_unary.length; ++i) {
-    var f = math_unary[i]
-    exports[f] = makeOp({
-                    args: ["array", "array"],
-                    pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                    body: {args:["a","b"], body:"a=this_f(b)", thisVars:["this_f"]},
-                    funcName: f
-                  })
-    exports[f+"eq"] = makeOp({
-                      args: ["array"],
-                      pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                      body: {args: ["a"], body:"a=this_f(a)", thisVars:["this_f"]},
-                      rvalue: true,
-                      count: 2,
-                      funcName: f+"eq"
-                    })
-  }
-})();
-
-var math_comm = [
-  "max",
-  "min",
-  "atan2",
-  "pow"
-]
-;(function(){
-  for(var i=0; i<math_comm.length; ++i) {
-    var f= math_comm[i]
-    exports[f] = makeOp({
-                  args:["array", "array", "array"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b","c"], body:"a=this_f(b,c)", thisVars:["this_f"]},
-                  funcName: f
-                })
-    exports[f+"s"] = makeOp({
-                  args:["array", "array", "scalar"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b","c"], body:"a=this_f(b,c)", thisVars:["this_f"]},
-                  funcName: f+"s"
-                  })
-    exports[f+"eq"] = makeOp({ args:["array", "array"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b"], body:"a=this_f(a,b)", thisVars:["this_f"]},
-                  rvalue: true,
-                  count: 2,
-                  funcName: f+"eq"
-                  })
-    exports[f+"seq"] = makeOp({ args:["array", "scalar"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b"], body:"a=this_f(a,b)", thisVars:["this_f"]},
-                  rvalue:true,
-                  count:2,
-                  funcName: f+"seq"
-                  })
-  }
-})();
-
-var math_noncomm = [
-  "atan2",
-  "pow"
-]
-;(function(){
-  for(var i=0; i<math_noncomm.length; ++i) {
-    var f= math_noncomm[i]
-    exports[f+"op"] = makeOp({
-                  args:["array", "array", "array"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b","c"], body:"a=this_f(c,b)", thisVars:["this_f"]},
-                  funcName: f+"op"
-                })
-    exports[f+"ops"] = makeOp({
-                  args:["array", "array", "scalar"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b","c"], body:"a=this_f(c,b)", thisVars:["this_f"]},
-                  funcName: f+"ops"
-                  })
-    exports[f+"opeq"] = makeOp({ args:["array", "array"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b"], body:"a=this_f(b,a)", thisVars:["this_f"]},
-                  rvalue: true,
-                  count: 2,
-                  funcName: f+"opeq"
-                  })
-    exports[f+"opseq"] = makeOp({ args:["array", "scalar"],
-                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
-                  body: {args:["a","b"], body:"a=this_f(b,a)", thisVars:["this_f"]},
-                  rvalue:true,
-                  count:2,
-                  funcName: f+"opseq"
-                  })
-  }
-})();
-
-exports.any = compile({
-  args:["array"],
-  pre: EmptyProc,
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:1}], body: "if(a){return true}", localVars: [], thisVars: []},
-  post: {args:[], localVars:[], thisVars:[], body:"return false"},
-  funcName: "any"
-})
-
-exports.all = compile({
-  args:["array"],
-  pre: EmptyProc,
-  body: {args:[{name:"x", lvalue:false, rvalue:true, count:1}], body: "if(!x){return false}", localVars: [], thisVars: []},
-  post: {args:[], localVars:[], thisVars:[], body:"return true"},
-  funcName: "all"
-})
-
-exports.sum = compile({
-  args:["array"],
-  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:1}], body: "this_s+=a", localVars: [], thisVars: ["this_s"]},
-  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
-  funcName: "sum"
-})
-
-exports.prod = compile({
-  args:["array"],
-  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=1"},
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:1}], body: "this_s*=a", localVars: [], thisVars: ["this_s"]},
-  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
-  funcName: "prod"
-})
-
-exports.norm2squared = compile({
-  args:["array"],
-  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:2}], body: "this_s+=a*a", localVars: [], thisVars: ["this_s"]},
-  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
-  funcName: "norm2squared"
-})
-  
-exports.norm2 = compile({
-  args:["array"],
-  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:2}], body: "this_s+=a*a", localVars: [], thisVars: ["this_s"]},
-  post: {args:[], localVars:[], thisVars:["this_s"], body:"return Math.sqrt(this_s)"},
-  funcName: "norm2"
-})
-  
-
-exports.norminf = compile({
-  args:["array"],
-  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:4}], body:"if(-a>this_s){this_s=-a}else if(a>this_s){this_s=a}", localVars: [], thisVars: ["this_s"]},
-  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
-  funcName: "norminf"
-})
-
-exports.norm1 = compile({
-  args:["array"],
-  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
-  body: {args:[{name:"a", lvalue:false, rvalue:true, count:3}], body: "this_s+=a<0?-a:a", localVars: [], thisVars: ["this_s"]},
-  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
-  funcName: "norm1"
-})
-
-exports.sup = compile({
-  args: [ "array" ],
-  pre:
-   { body: "this_h=-Infinity",
-     args: [],
-     thisVars: [ "this_h" ],
-     localVars: [] },
-  body:
-   { body: "if(_inline_1_arg0_>this_h)this_h=_inline_1_arg0_",
-     args: [{"name":"_inline_1_arg0_","lvalue":false,"rvalue":true,"count":2} ],
-     thisVars: [ "this_h" ],
-     localVars: [] },
-  post:
-   { body: "return this_h",
-     args: [],
-     thisVars: [ "this_h" ],
-     localVars: [] }
- })
-
-exports.inf = compile({
-  args: [ "array" ],
-  pre:
-   { body: "this_h=Infinity",
-     args: [],
-     thisVars: [ "this_h" ],
-     localVars: [] },
-  body:
-   { body: "if(_inline_1_arg0_<this_h)this_h=_inline_1_arg0_",
-     args: [{"name":"_inline_1_arg0_","lvalue":false,"rvalue":true,"count":2} ],
-     thisVars: [ "this_h" ],
-     localVars: [] },
-  post:
-   { body: "return this_h",
-     args: [],
-     thisVars: [ "this_h" ],
-     localVars: [] }
- })
-
-exports.argmin = compile({
-  args:["index","array","shape"],
-  pre:{
-    body:"{this_v=Infinity;this_i=_inline_0_arg2_.slice(0)}",
-    args:[
-      {name:"_inline_0_arg0_",lvalue:false,rvalue:false,count:0},
-      {name:"_inline_0_arg1_",lvalue:false,rvalue:false,count:0},
-      {name:"_inline_0_arg2_",lvalue:false,rvalue:true,count:1}
-      ],
-    thisVars:["this_i","this_v"],
-    localVars:[]},
-  body:{
-    body:"{if(_inline_1_arg1_<this_v){this_v=_inline_1_arg1_;for(var _inline_1_k=0;_inline_1_k<_inline_1_arg0_.length;++_inline_1_k){this_i[_inline_1_k]=_inline_1_arg0_[_inline_1_k]}}}",
-    args:[
-      {name:"_inline_1_arg0_",lvalue:false,rvalue:true,count:2},
-      {name:"_inline_1_arg1_",lvalue:false,rvalue:true,count:2}],
-    thisVars:["this_i","this_v"],
-    localVars:["_inline_1_k"]},
-  post:{
-    body:"{return this_i}",
-    args:[],
-    thisVars:["this_i"],
-    localVars:[]}
-})
-
-exports.argmax = compile({
-  args:["index","array","shape"],
-  pre:{
-    body:"{this_v=-Infinity;this_i=_inline_0_arg2_.slice(0)}",
-    args:[
-      {name:"_inline_0_arg0_",lvalue:false,rvalue:false,count:0},
-      {name:"_inline_0_arg1_",lvalue:false,rvalue:false,count:0},
-      {name:"_inline_0_arg2_",lvalue:false,rvalue:true,count:1}
-      ],
-    thisVars:["this_i","this_v"],
-    localVars:[]},
-  body:{
-    body:"{if(_inline_1_arg1_>this_v){this_v=_inline_1_arg1_;for(var _inline_1_k=0;_inline_1_k<_inline_1_arg0_.length;++_inline_1_k){this_i[_inline_1_k]=_inline_1_arg0_[_inline_1_k]}}}",
-    args:[
-      {name:"_inline_1_arg0_",lvalue:false,rvalue:true,count:2},
-      {name:"_inline_1_arg1_",lvalue:false,rvalue:true,count:2}],
-    thisVars:["this_i","this_v"],
-    localVars:["_inline_1_k"]},
-  post:{
-    body:"{return this_i}",
-    args:[],
-    thisVars:["this_i"],
-    localVars:[]}
-})  
-
-exports.random = makeOp({
-  args: ["array"],
-  pre: {args:[], body:"this_f=Math.random", thisVars:["this_f"]},
-  body: {args: ["a"], body:"a=this_f()", thisVars:["this_f"]},
-  funcName: "random"
-})
-
-exports.assign = makeOp({
-  args:["array", "array"],
-  body: {args:["a", "b"], body:"a=b"},
-  funcName: "assign" })
-
-exports.assigns = makeOp({
-  args:["array", "scalar"],
-  body: {args:["a", "b"], body:"a=b"},
-  funcName: "assigns" })
-
-
-},{"cwise-compiler":122}],101:[function(require,module,exports){
+},{"cwise-parser":120,"cwise-compiler":121}],101:[function(require,module,exports){
 (function(global){"use strict"
 
 var bits = require("bit-twiddle")
@@ -20054,27 +19611,456 @@ exports.clearCache = function clearCache() {
 }
 
 })(self)
-},{"bit-twiddle":123,"dup":124}],85:[function(require,module,exports){
+},{"bit-twiddle":122,"dup":123}],102:[function(require,module,exports){
 "use strict"
 
-var findBasis = require("find-basis-3d")
+var compile = require("cwise-compiler")
 
-module.exports = createPlanePolygon
-
-function createPlanePolygon(plane, size) {
-  size = size || 1e6
-  var basis = findBasis(plane)
-  var poly = [[0,0,0], [0,0,0], [0,0,0], [0,0,0]]
-  for(var i=0; i<3; ++i) {
-    var o = -basis[2][i] * plane[3]
-    poly[0][i] = o - size * basis[0][i] - size * basis[1][i]
-    poly[1][i] = o + size * basis[0][i] - size * basis[1][i]
-    poly[2][i] = o + size * basis[0][i] + size * basis[1][i]
-    poly[3][i] = o - size * basis[0][i] + size * basis[1][i]
-  }
-  return poly
+var EmptyProc = {
+  body: "",
+  args: [],
+  thisVars: [],
+  localVars: []
 }
-},{"find-basis-3d":125}],86:[function(require,module,exports){
+
+function fixup(x) {
+  if(!x) {
+    return EmptyProc
+  }
+  for(var i=0; i<x.args.length; ++i) {
+    var a = x.args[i]
+    if(i === 0) {
+      x.args[i] = {name: a, lvalue:true, rvalue: !!x.rvalue, count:x.count||1 }
+    } else {
+      x.args[i] = {name: a, lvalue:false, rvalue:true, count: 1}
+    }
+  }
+  if(!x.thisVars) {
+    x.thisVars = []
+  }
+  if(!x.localVars) {
+    x.localVars = []
+  }
+  return x
+}
+
+function pcompile(user_args) {
+  return compile({
+    args:     user_args.args,
+    pre:      fixup(user_args.pre),
+    body:     fixup(user_args.body),
+    post:     fixup(user_args.proc),
+    funcName: user_args.funcName
+  })
+}
+
+function makeOp(user_args) {
+  var args = []
+  for(var i=0; i<user_args.args.length; ++i) {
+    args.push("a"+i)
+  }
+  var wrapper = new Function("P", [
+    "return function ", user_args.funcName, "_ndarrayops(", args.join(","), ") {P(", args.join(","), ");return a0}"
+  ].join(""))
+  return wrapper(pcompile(user_args))
+}
+
+var assign_ops = {
+  add:  "+",
+  sub:  "-",
+  mul:  "*",
+  div:  "/",
+  mod:  "%",
+  band: "&",
+  bor:  "|",
+  bxor: "^",
+  lshift: "<<",
+  rshift: ">>",
+  rrshift: ">>>"
+}
+;(function(){
+  for(var id in assign_ops) {
+    var op = assign_ops[id]
+    exports[id] = makeOp({
+      args: ["array","array","array"],
+      body: {args:["a","b","c"],
+             body: "a=b"+op+"c"},
+      funcName: id
+    })
+    exports[id+"eq"] = makeOp({
+      args: ["array","array"],
+      body: {args:["a","b"],
+             body:"a"+op+"=b"},
+      rvalue: true,
+      funcName: id+"eq"
+    })
+    exports[id+"s"] = makeOp({
+      args: ["array", "array", "scalar"],
+      body: {args:["a","b","s"],
+             body:"a=b"+op+"s"},
+      funcName: id+"s"
+    })
+    exports[id+"seq"] = makeOp({
+      args: ["array","scalar"],
+      body: {args:["a","s"],
+             body:"a"+op+"=s"},
+      rvalue: true,
+      funcName: id+"seq"
+    })
+  }
+})();
+
+var unary_ops = {
+  not: "!",
+  bnot: "~",
+  neg: "-",
+  recip: "1.0/"
+}
+;(function(){
+  for(var id in unary_ops) {
+    var op = unary_ops[id]
+    exports[id] = makeOp({
+      args: ["array", "array"],
+      body: {args:["a","b"],
+             body:"a="+op+"b"},
+      funcName: id
+    })
+    exports[id+"eq"] = makeOp({
+      args: ["array"],
+      body: {args:["a"],
+             body:"a="+op+"a"},
+      rvalue: true,
+      count: 2,
+      funcName: id+"eq"
+    })
+  }
+})();
+
+var binary_ops = {
+  and: "&&",
+  or: "||",
+  eq: "===",
+  neq: "!==",
+  lt: "<",
+  gt: ">",
+  leq: "<=",
+  geq: ">="
+}
+;(function() {
+  for(var id in binary_ops) {
+    var op = binary_ops[id]
+    exports[id] = makeOp({
+      args: ["array","array","array"],
+      body: {args:["a", "b", "c"],
+             body:"a=b"+op+"c"},
+      funcName: id
+    })
+    exports[id+"s"] = makeOp({
+      args: ["array","array","scalar"],
+      body: {args:["a", "b", "s"],
+             body:"a=b"+op+"s"},
+      funcName: id+"s"
+    })
+    exports[id+"eq"] = makeOp({
+      args: ["array", "array"],
+      body: {args:["a", "b"],
+             body:"a=a"+op+"b"},
+      rvalue:true,
+      count:2,
+      funcName: id+"eq"
+    })
+    exports[id+"seq"] = makeOp({
+      args: ["array", "scalar"],
+      body: {args:["a","s"],
+             body:"a=a"+op+"s"},
+      rvalue:true,
+      count:2,
+      funcName: id+"seq"
+    })
+  }
+})();
+
+var math_unary = [
+  "abs",
+  "acos",
+  "asin",
+  "atan",
+  "ceil",
+  "cos",
+  "exp",
+  "floor",
+  "log",
+  "round",
+  "sin",
+  "sqrt",
+  "tan"
+]
+;(function() {
+  for(var i=0; i<math_unary.length; ++i) {
+    var f = math_unary[i]
+    exports[f] = makeOp({
+                    args: ["array", "array"],
+                    pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                    body: {args:["a","b"], body:"a=this_f(b)", thisVars:["this_f"]},
+                    funcName: f
+                  })
+    exports[f+"eq"] = makeOp({
+                      args: ["array"],
+                      pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                      body: {args: ["a"], body:"a=this_f(a)", thisVars:["this_f"]},
+                      rvalue: true,
+                      count: 2,
+                      funcName: f+"eq"
+                    })
+  }
+})();
+
+var math_comm = [
+  "max",
+  "min",
+  "atan2",
+  "pow"
+]
+;(function(){
+  for(var i=0; i<math_comm.length; ++i) {
+    var f= math_comm[i]
+    exports[f] = makeOp({
+                  args:["array", "array", "array"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b","c"], body:"a=this_f(b,c)", thisVars:["this_f"]},
+                  funcName: f
+                })
+    exports[f+"s"] = makeOp({
+                  args:["array", "array", "scalar"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b","c"], body:"a=this_f(b,c)", thisVars:["this_f"]},
+                  funcName: f+"s"
+                  })
+    exports[f+"eq"] = makeOp({ args:["array", "array"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b"], body:"a=this_f(a,b)", thisVars:["this_f"]},
+                  rvalue: true,
+                  count: 2,
+                  funcName: f+"eq"
+                  })
+    exports[f+"seq"] = makeOp({ args:["array", "scalar"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b"], body:"a=this_f(a,b)", thisVars:["this_f"]},
+                  rvalue:true,
+                  count:2,
+                  funcName: f+"seq"
+                  })
+  }
+})();
+
+var math_noncomm = [
+  "atan2",
+  "pow"
+]
+;(function(){
+  for(var i=0; i<math_noncomm.length; ++i) {
+    var f= math_noncomm[i]
+    exports[f+"op"] = makeOp({
+                  args:["array", "array", "array"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b","c"], body:"a=this_f(c,b)", thisVars:["this_f"]},
+                  funcName: f+"op"
+                })
+    exports[f+"ops"] = makeOp({
+                  args:["array", "array", "scalar"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b","c"], body:"a=this_f(c,b)", thisVars:["this_f"]},
+                  funcName: f+"ops"
+                  })
+    exports[f+"opeq"] = makeOp({ args:["array", "array"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b"], body:"a=this_f(b,a)", thisVars:["this_f"]},
+                  rvalue: true,
+                  count: 2,
+                  funcName: f+"opeq"
+                  })
+    exports[f+"opseq"] = makeOp({ args:["array", "scalar"],
+                  pre: {args:[], body:"this_f=Math."+f, thisVars:["this_f"]},
+                  body: {args:["a","b"], body:"a=this_f(b,a)", thisVars:["this_f"]},
+                  rvalue:true,
+                  count:2,
+                  funcName: f+"opseq"
+                  })
+  }
+})();
+
+exports.any = compile({
+  args:["array"],
+  pre: EmptyProc,
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:1}], body: "if(a){return true}", localVars: [], thisVars: []},
+  post: {args:[], localVars:[], thisVars:[], body:"return false"},
+  funcName: "any"
+})
+
+exports.all = compile({
+  args:["array"],
+  pre: EmptyProc,
+  body: {args:[{name:"x", lvalue:false, rvalue:true, count:1}], body: "if(!x){return false}", localVars: [], thisVars: []},
+  post: {args:[], localVars:[], thisVars:[], body:"return true"},
+  funcName: "all"
+})
+
+exports.sum = compile({
+  args:["array"],
+  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:1}], body: "this_s+=a", localVars: [], thisVars: ["this_s"]},
+  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
+  funcName: "sum"
+})
+
+exports.prod = compile({
+  args:["array"],
+  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=1"},
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:1}], body: "this_s*=a", localVars: [], thisVars: ["this_s"]},
+  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
+  funcName: "prod"
+})
+
+exports.norm2squared = compile({
+  args:["array"],
+  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:2}], body: "this_s+=a*a", localVars: [], thisVars: ["this_s"]},
+  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
+  funcName: "norm2squared"
+})
+  
+exports.norm2 = compile({
+  args:["array"],
+  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:2}], body: "this_s+=a*a", localVars: [], thisVars: ["this_s"]},
+  post: {args:[], localVars:[], thisVars:["this_s"], body:"return Math.sqrt(this_s)"},
+  funcName: "norm2"
+})
+  
+
+exports.norminf = compile({
+  args:["array"],
+  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:4}], body:"if(-a>this_s){this_s=-a}else if(a>this_s){this_s=a}", localVars: [], thisVars: ["this_s"]},
+  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
+  funcName: "norminf"
+})
+
+exports.norm1 = compile({
+  args:["array"],
+  pre: {args:[], localVars:[], thisVars:["this_s"], body:"this_s=0"},
+  body: {args:[{name:"a", lvalue:false, rvalue:true, count:3}], body: "this_s+=a<0?-a:a", localVars: [], thisVars: ["this_s"]},
+  post: {args:[], localVars:[], thisVars:["this_s"], body:"return this_s"},
+  funcName: "norm1"
+})
+
+exports.sup = compile({
+  args: [ "array" ],
+  pre:
+   { body: "this_h=-Infinity",
+     args: [],
+     thisVars: [ "this_h" ],
+     localVars: [] },
+  body:
+   { body: "if(_inline_1_arg0_>this_h)this_h=_inline_1_arg0_",
+     args: [{"name":"_inline_1_arg0_","lvalue":false,"rvalue":true,"count":2} ],
+     thisVars: [ "this_h" ],
+     localVars: [] },
+  post:
+   { body: "return this_h",
+     args: [],
+     thisVars: [ "this_h" ],
+     localVars: [] }
+ })
+
+exports.inf = compile({
+  args: [ "array" ],
+  pre:
+   { body: "this_h=Infinity",
+     args: [],
+     thisVars: [ "this_h" ],
+     localVars: [] },
+  body:
+   { body: "if(_inline_1_arg0_<this_h)this_h=_inline_1_arg0_",
+     args: [{"name":"_inline_1_arg0_","lvalue":false,"rvalue":true,"count":2} ],
+     thisVars: [ "this_h" ],
+     localVars: [] },
+  post:
+   { body: "return this_h",
+     args: [],
+     thisVars: [ "this_h" ],
+     localVars: [] }
+ })
+
+exports.argmin = compile({
+  args:["index","array","shape"],
+  pre:{
+    body:"{this_v=Infinity;this_i=_inline_0_arg2_.slice(0)}",
+    args:[
+      {name:"_inline_0_arg0_",lvalue:false,rvalue:false,count:0},
+      {name:"_inline_0_arg1_",lvalue:false,rvalue:false,count:0},
+      {name:"_inline_0_arg2_",lvalue:false,rvalue:true,count:1}
+      ],
+    thisVars:["this_i","this_v"],
+    localVars:[]},
+  body:{
+    body:"{if(_inline_1_arg1_<this_v){this_v=_inline_1_arg1_;for(var _inline_1_k=0;_inline_1_k<_inline_1_arg0_.length;++_inline_1_k){this_i[_inline_1_k]=_inline_1_arg0_[_inline_1_k]}}}",
+    args:[
+      {name:"_inline_1_arg0_",lvalue:false,rvalue:true,count:2},
+      {name:"_inline_1_arg1_",lvalue:false,rvalue:true,count:2}],
+    thisVars:["this_i","this_v"],
+    localVars:["_inline_1_k"]},
+  post:{
+    body:"{return this_i}",
+    args:[],
+    thisVars:["this_i"],
+    localVars:[]}
+})
+
+exports.argmax = compile({
+  args:["index","array","shape"],
+  pre:{
+    body:"{this_v=-Infinity;this_i=_inline_0_arg2_.slice(0)}",
+    args:[
+      {name:"_inline_0_arg0_",lvalue:false,rvalue:false,count:0},
+      {name:"_inline_0_arg1_",lvalue:false,rvalue:false,count:0},
+      {name:"_inline_0_arg2_",lvalue:false,rvalue:true,count:1}
+      ],
+    thisVars:["this_i","this_v"],
+    localVars:[]},
+  body:{
+    body:"{if(_inline_1_arg1_>this_v){this_v=_inline_1_arg1_;for(var _inline_1_k=0;_inline_1_k<_inline_1_arg0_.length;++_inline_1_k){this_i[_inline_1_k]=_inline_1_arg0_[_inline_1_k]}}}",
+    args:[
+      {name:"_inline_1_arg0_",lvalue:false,rvalue:true,count:2},
+      {name:"_inline_1_arg1_",lvalue:false,rvalue:true,count:2}],
+    thisVars:["this_i","this_v"],
+    localVars:["_inline_1_k"]},
+  post:{
+    body:"{return this_i}",
+    args:[],
+    thisVars:["this_i"],
+    localVars:[]}
+})  
+
+exports.random = makeOp({
+  args: ["array"],
+  pre: {args:[], body:"this_f=Math.random", thisVars:["this_f"]},
+  body: {args: ["a"], body:"a=this_f()", thisVars:["this_f"]},
+  funcName: "random"
+})
+
+exports.assign = makeOp({
+  args:["array", "array"],
+  body: {args:["a", "b"], body:"a=b"},
+  funcName: "assign" })
+
+exports.assigns = makeOp({
+  args:["array", "scalar"],
+  body: {args:["a", "b"], body:"a=b"},
+  funcName: "assigns" })
+
+
+},{"cwise-compiler":124}],84:[function(require,module,exports){
 "use strict"
 
 var robustDot = require("robust-dot-product")
@@ -20166,7 +20152,27 @@ function negative(points, plane) {
   }
   return neg
 }
-},{"robust-dot-product":126,"robust-sum":127}],89:[function(require,module,exports){
+},{"robust-dot-product":125,"robust-sum":126}],85:[function(require,module,exports){
+"use strict"
+
+var findBasis = require("find-basis-3d")
+
+module.exports = createPlanePolygon
+
+function createPlanePolygon(plane, size) {
+  size = size || 1e6
+  var basis = findBasis(plane)
+  var poly = [[0,0,0], [0,0,0], [0,0,0], [0,0,0]]
+  for(var i=0; i<3; ++i) {
+    var o = -basis[2][i] * plane[3]
+    poly[0][i] = o - size * basis[0][i] - size * basis[1][i]
+    poly[1][i] = o + size * basis[0][i] - size * basis[1][i]
+    poly[2][i] = o + size * basis[0][i] + size * basis[1][i]
+    poly[3][i] = o - size * basis[0][i] + size * basis[1][i]
+  }
+  return poly
+}
+},{"find-basis-3d":127}],87:[function(require,module,exports){
 "use strict"
 
 var PNG = require("pngjs").PNG
@@ -20258,71 +20264,492 @@ module.exports = function savePixels(array, type) {
   }
 }
 
-},{"pngjs":128,"through":129}],106:[function(require,module,exports){
-"use strict"
+},{"pngjs":128,"through":129}],110:[function(require,module,exports){
+(function(){/* (The MIT License)
+ *
+ * Copyright (c) 2012 Brandon Benvie <http://bbenvie.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+ * associated documentation files (the 'Software'), to deal in the Software without restriction,
+ * including without limitation the rights to use, copy, modify, merge, publish, distribute,
+ * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included with all copies or
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+ * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
-var compile = require("./compile.js")
+// Original WeakMap implementation by Gozala @ https://gist.github.com/1269991
+// Updated and bugfixed by Raynos @ https://gist.github.com/1638059
+// Expanded by Benvie @ https://github.com/Benvie/harmony-collections
 
-function createThunk(proc) {
-  var code = ["'use strict'", "var CACHED={}"]
-  var vars = []
-  var thunkName = proc.funcName + "_cwise_thunk"
-  
-  //Build thunk
-  code.push(["return function ", thunkName, "(", proc.shimArgs.join(","), "){"].join(""))
-  var typesig = []
-  var string_typesig = []
-  var proc_args = [["array",proc.arrayArgs[0],".shape"].join("")]
-  for(var i=0; i<proc.arrayArgs.length; ++i) {
-    var j = proc.arrayArgs[i]
-    vars.push(["t", j, "=array", j, ".dtype,",
-               "r", j, "=array", j, ".order"].join(""))
-    typesig.push("t" + j)
-    typesig.push("r" + j)
-    string_typesig.push("t"+j)
-    string_typesig.push("r"+j+".join()")
-    proc_args.push("array" + j + ".data")
-    proc_args.push("array" + j + ".stride")
-    proc_args.push("array" + j + ".offset|0")
-  }
-  for(var i=0; i<proc.scalarArgs.length; ++i) {
-    proc_args.push("scalar" + proc.scalarArgs[i])
-  }
-  vars.push(["type=[", string_typesig.join(","), "].join()"].join(""))
-  vars.push("proc=CACHED[type]")
-  code.push("var " + vars.join(","))
-  
-  code.push(["if(!proc){",
-             "CACHED[type]=proc=compile([", typesig.join(","), "])}",
-             "return proc(", proc_args.join(","), ")}"].join(""))
+void function(global, undefined_, undefined){
+  var getProps = Object.getOwnPropertyNames,
+      defProp  = Object.defineProperty,
+      toSource = Function.prototype.toString,
+      create   = Object.create,
+      hasOwn   = Object.prototype.hasOwnProperty,
+      funcName = /^\n?function\s?(\w*)?_?\(/;
 
-  if(proc.debug) {
-    console.log("Generated thunk:", code.join("\n"))
-  }
-  
-  //Compile thunk
-  var thunk = new Function("compile", code.join("\n"))
-  return thunk(compile.bind(undefined, proc))
-}
 
-module.exports = createThunk
-
-},{"./compile.js":130}],110:[function(require,module,exports){
-"use strict"
-
-function bisect(pred, lo, hi, tol) {
-  tol = tol || 1e-8
-  while(hi-lo>tol) {
-    var m = (hi+lo)/2
-    if(pred(m)) {
-      hi = m
-    } else {
-      lo = m
+  function define(object, key, value){
+    if (typeof key === 'function') {
+      value = key;
+      key = nameOf(value).replace(/_$/, '');
     }
+    return defProp(object, key, { configurable: true, writable: true, value: value });
   }
-  return lo
-}
-module.exports = bisect
+
+  function nameOf(func){
+    return typeof func !== 'function'
+          ? '' : 'name' in func
+          ? func.name : toSource.call(func).match(funcName)[1];
+  }
+
+  // ############
+  // ### Data ###
+  // ############
+
+  var Data = (function(){
+    var dataDesc = { value: { writable: true, value: undefined } },
+        datalock = 'return function(k){if(k===s)return l}',
+        uids     = create(null),
+
+        createUID = function(){
+          var key = Math.random().toString(36).slice(2);
+          return key in uids ? createUID() : uids[key] = key;
+        },
+
+        globalID = createUID(),
+
+        storage = function(obj){
+          if (hasOwn.call(obj, globalID))
+            return obj[globalID];
+
+          if (!Object.isExtensible(obj))
+            throw new TypeError("Object must be extensible");
+
+          var store = create(null);
+          defProp(obj, globalID, { value: store });
+          return store;
+        };
+
+    // common per-object storage area made visible by patching getOwnPropertyNames'
+    define(Object, function getOwnPropertyNames(obj){
+      var props = getProps(obj);
+      if (hasOwn.call(obj, globalID))
+        props.splice(props.indexOf(globalID), 1);
+      return props;
+    });
+
+    function Data(){
+      var puid = createUID(),
+          secret = {};
+
+      this.unlock = function(obj){
+        var store = storage(obj);
+        if (hasOwn.call(store, puid))
+          return store[puid](secret);
+
+        var data = create(null, dataDesc);
+        defProp(store, puid, {
+          value: new Function('s', 'l', datalock)(secret, data)
+        });
+        return data;
+      }
+    }
+
+    define(Data.prototype, function get(o){ return this.unlock(o).value });
+    define(Data.prototype, function set(o, v){ this.unlock(o).value = v });
+
+    return Data;
+  }());
+
+
+  var WM = (function(data){
+    var validate = function(key){
+      if (key == null || typeof key !== 'object' && typeof key !== 'function')
+        throw new TypeError("Invalid WeakMap key");
+    }
+
+    var wrap = function(collection, value){
+      var store = data.unlock(collection);
+      if (store.value)
+        throw new TypeError("Object is already a WeakMap");
+      store.value = value;
+    }
+
+    var unwrap = function(collection){
+      var storage = data.unlock(collection).value;
+      if (!storage)
+        throw new TypeError("WeakMap is not generic");
+      return storage;
+    }
+
+    var initialize = function(weakmap, iterable){
+      if (iterable !== null && typeof iterable === 'object' && typeof iterable.forEach === 'function') {
+        iterable.forEach(function(item, i){
+          if (item instanceof Array && item.length === 2)
+            set.call(weakmap, iterable[i][0], iterable[i][1]);
+        });
+      }
+    }
+
+
+    function WeakMap(iterable){
+      if (this === global || this == null || this === WeakMap.prototype)
+        return new WeakMap(iterable);
+
+      wrap(this, new Data);
+      initialize(this, iterable);
+    }
+
+    function get(key){
+      validate(key);
+      var value = unwrap(this).get(key);
+      return value === undefined_ ? undefined : value;
+    }
+
+    function set(key, value){
+      validate(key);
+      // store a token for explicit undefined so that "has" works correctly
+      unwrap(this).set(key, value === undefined ? undefined_ : value);
+    }
+
+    function has(key){
+      validate(key);
+      return unwrap(this).get(key) !== undefined;
+    }
+
+    function delete_(key){
+      validate(key);
+      var data = unwrap(this),
+          had = data.get(key) !== undefined;
+      data.set(key, undefined);
+      return had;
+    }
+
+    function toString(){
+      unwrap(this);
+      return '[object WeakMap]';
+    }
+
+    try {
+      var src = ('return '+delete_).replace('e_', '\\u0065'),
+          del = new Function('unwrap', 'validate', src)(unwrap, validate);
+    } catch (e) {
+      var del = delete_;
+    }
+
+    var src = (''+Object).split('Object');
+    var stringifier = function toString(){
+      return src[0] + nameOf(this) + src[1];
+    };
+
+    define(stringifier, stringifier);
+
+    var prep = { __proto__: [] } instanceof Array
+      ? function(f){ f.__proto__ = stringifier }
+      : function(f){ define(f, stringifier) };
+
+    prep(WeakMap);
+
+    [toString, get, set, has, del].forEach(function(method){
+      define(WeakMap.prototype, method);
+      prep(method);
+    });
+
+    return WeakMap;
+  }(new Data));
+
+  var defaultCreator = Object.create
+    ? function(){ return Object.create(null) }
+    : function(){ return {} };
+
+  function createStorage(creator){
+    var weakmap = new WM;
+    creator || (creator = defaultCreator);
+
+    function storage(object, value){
+      if (value || arguments.length === 2) {
+        weakmap.set(object, value);
+      } else {
+        value = weakmap.get(object);
+        if (value === undefined) {
+          value = creator(object);
+          weakmap.set(object, value);
+        }
+      }
+      return value;
+    }
+
+    return storage;
+  }
+
+
+  if (typeof module !== 'undefined') {
+    module.exports = WM;
+  } else if (typeof exports !== 'undefined') {
+    exports.WeakMap = WM;
+  } else if (!('WeakMap' in global)) {
+    global.WeakMap = WM;
+  }
+
+  WM.createStorage = createStorage;
+  if (global.WeakMap)
+    global.WeakMap.createStorage = createStorage;
+}((0, eval)('this'));
+
+})()
+},{}],111:[function(require,module,exports){
+(function(){/* (The MIT License)
+ *
+ * Copyright (c) 2012 Brandon Benvie <http://bbenvie.com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+ * associated documentation files (the 'Software'), to deal in the Software without restriction,
+ * including without limitation the rights to use, copy, modify, merge, publish, distribute,
+ * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included with all copies or
+ * substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
+ * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  CLAIM,
+ * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+// Original WeakMap implementation by Gozala @ https://gist.github.com/1269991
+// Updated and bugfixed by Raynos @ https://gist.github.com/1638059
+// Expanded by Benvie @ https://github.com/Benvie/harmony-collections
+
+void function(global, undefined_, undefined){
+  var getProps = Object.getOwnPropertyNames,
+      defProp  = Object.defineProperty,
+      toSource = Function.prototype.toString,
+      create   = Object.create,
+      hasOwn   = Object.prototype.hasOwnProperty,
+      funcName = /^\n?function\s?(\w*)?_?\(/;
+
+
+  function define(object, key, value){
+    if (typeof key === 'function') {
+      value = key;
+      key = nameOf(value).replace(/_$/, '');
+    }
+    return defProp(object, key, { configurable: true, writable: true, value: value });
+  }
+
+  function nameOf(func){
+    return typeof func !== 'function'
+          ? '' : 'name' in func
+          ? func.name : toSource.call(func).match(funcName)[1];
+  }
+
+  // ############
+  // ### Data ###
+  // ############
+
+  var Data = (function(){
+    var dataDesc = { value: { writable: true, value: undefined } },
+        datalock = 'return function(k){if(k===s)return l}',
+        uids     = create(null),
+
+        createUID = function(){
+          var key = Math.random().toString(36).slice(2);
+          return key in uids ? createUID() : uids[key] = key;
+        },
+
+        globalID = createUID(),
+
+        storage = function(obj){
+          if (hasOwn.call(obj, globalID))
+            return obj[globalID];
+
+          if (!Object.isExtensible(obj))
+            throw new TypeError("Object must be extensible");
+
+          var store = create(null);
+          defProp(obj, globalID, { value: store });
+          return store;
+        };
+
+    // common per-object storage area made visible by patching getOwnPropertyNames'
+    define(Object, function getOwnPropertyNames(obj){
+      var props = getProps(obj);
+      if (hasOwn.call(obj, globalID))
+        props.splice(props.indexOf(globalID), 1);
+      return props;
+    });
+
+    function Data(){
+      var puid = createUID(),
+          secret = {};
+
+      this.unlock = function(obj){
+        var store = storage(obj);
+        if (hasOwn.call(store, puid))
+          return store[puid](secret);
+
+        var data = create(null, dataDesc);
+        defProp(store, puid, {
+          value: new Function('s', 'l', datalock)(secret, data)
+        });
+        return data;
+      }
+    }
+
+    define(Data.prototype, function get(o){ return this.unlock(o).value });
+    define(Data.prototype, function set(o, v){ this.unlock(o).value = v });
+
+    return Data;
+  }());
+
+
+  var WM = (function(data){
+    var validate = function(key){
+      if (key == null || typeof key !== 'object' && typeof key !== 'function')
+        throw new TypeError("Invalid WeakMap key");
+    }
+
+    var wrap = function(collection, value){
+      var store = data.unlock(collection);
+      if (store.value)
+        throw new TypeError("Object is already a WeakMap");
+      store.value = value;
+    }
+
+    var unwrap = function(collection){
+      var storage = data.unlock(collection).value;
+      if (!storage)
+        throw new TypeError("WeakMap is not generic");
+      return storage;
+    }
+
+    var initialize = function(weakmap, iterable){
+      if (iterable !== null && typeof iterable === 'object' && typeof iterable.forEach === 'function') {
+        iterable.forEach(function(item, i){
+          if (item instanceof Array && item.length === 2)
+            set.call(weakmap, iterable[i][0], iterable[i][1]);
+        });
+      }
+    }
+
+
+    function WeakMap(iterable){
+      if (this === global || this == null || this === WeakMap.prototype)
+        return new WeakMap(iterable);
+
+      wrap(this, new Data);
+      initialize(this, iterable);
+    }
+
+    function get(key){
+      validate(key);
+      var value = unwrap(this).get(key);
+      return value === undefined_ ? undefined : value;
+    }
+
+    function set(key, value){
+      validate(key);
+      // store a token for explicit undefined so that "has" works correctly
+      unwrap(this).set(key, value === undefined ? undefined_ : value);
+    }
+
+    function has(key){
+      validate(key);
+      return unwrap(this).get(key) !== undefined;
+    }
+
+    function delete_(key){
+      validate(key);
+      var data = unwrap(this),
+          had = data.get(key) !== undefined;
+      data.set(key, undefined);
+      return had;
+    }
+
+    function toString(){
+      unwrap(this);
+      return '[object WeakMap]';
+    }
+
+    try {
+      var src = ('return '+delete_).replace('e_', '\\u0065'),
+          del = new Function('unwrap', 'validate', src)(unwrap, validate);
+    } catch (e) {
+      var del = delete_;
+    }
+
+    var src = (''+Object).split('Object');
+    var stringifier = function toString(){
+      return src[0] + nameOf(this) + src[1];
+    };
+
+    define(stringifier, stringifier);
+
+    var prep = { __proto__: [] } instanceof Array
+      ? function(f){ f.__proto__ = stringifier }
+      : function(f){ define(f, stringifier) };
+
+    prep(WeakMap);
+
+    [toString, get, set, has, del].forEach(function(method){
+      define(WeakMap.prototype, method);
+      prep(method);
+    });
+
+    return WeakMap;
+  }(new Data));
+
+  var defaultCreator = Object.create
+    ? function(){ return Object.create(null) }
+    : function(){ return {} };
+
+  function createStorage(creator){
+    var weakmap = new WM;
+    creator || (creator = defaultCreator);
+
+    function storage(object, value){
+      if (value || arguments.length === 2) {
+        weakmap.set(object, value);
+      } else {
+        value = weakmap.get(object);
+        if (value === undefined) {
+          value = creator(object);
+          weakmap.set(object, value);
+        }
+      }
+      return value;
+    }
+
+    return storage;
+  }
+
+
+  if (typeof module !== 'undefined') {
+    module.exports = WM;
+  } else if (typeof exports !== 'undefined') {
+    exports.WeakMap = WM;
+  } else if (!('WeakMap' in global)) {
+    global.WeakMap = WM;
+  }
+
+  WM.createStorage = createStorage;
+  if (global.WeakMap)
+    global.WeakMap.createStorage = createStorage;
+}((0, eval)('this'));
+
+})()
 },{}],112:[function(require,module,exports){
 "use strict"
 
@@ -20373,699 +20800,56 @@ function dupe(count, value) {
 }
 
 module.exports = dupe
-},{}],113:[function(require,module,exports){
-/**
- * Bit twiddling hacks for JavaScript.
- *
- * Author: Mikola Lysenko
- *
- * Ported from Stanford bit twiddling hack library:
- *    http://graphics.stanford.edu/~seander/bithacks.html
- */
+},{}],106:[function(require,module,exports){
+"use strict"
 
-"use strict"; "use restrict";
+var compile = require("./compile.js")
 
-//Number of bits in an integer
-var INT_BITS = 32;
-
-//Constants
-exports.INT_BITS  = INT_BITS;
-exports.INT_MAX   =  0x7fffffff;
-exports.INT_MIN   = -1<<(INT_BITS-1);
-
-//Returns -1, 0, +1 depending on sign of x
-exports.sign = function(v) {
-  return (v > 0) - (v < 0);
-}
-
-//Computes absolute value of integer
-exports.abs = function(v) {
-  var mask = v >> (INT_BITS-1);
-  return (v ^ mask) - mask;
-}
-
-//Computes minimum of integers x and y
-exports.min = function(x, y) {
-  return y ^ ((x ^ y) & -(x < y));
-}
-
-//Computes maximum of integers x and y
-exports.max = function(x, y) {
-  return x ^ ((x ^ y) & -(x < y));
-}
-
-//Checks if a number is a power of two
-exports.isPow2 = function(v) {
-  return !(v & (v-1)) && (!!v);
-}
-
-//Computes log base 2 of v
-exports.log2 = function(v) {
-  var r, shift;
-  r =     (v > 0xFFFF) << 4; v >>>= r;
-  shift = (v > 0xFF  ) << 3; v >>>= shift; r |= shift;
-  shift = (v > 0xF   ) << 2; v >>>= shift; r |= shift;
-  shift = (v > 0x3   ) << 1; v >>>= shift; r |= shift;
-  return r | (v >> 1);
-}
-
-//Computes log base 10 of v
-exports.log10 = function(v) {
-  return  (v >= 1000000000) ? 9 : (v >= 100000000) ? 8 : (v >= 10000000) ? 7 :
-          (v >= 1000000) ? 6 : (v >= 100000) ? 5 : (v >= 10000) ? 4 :
-          (v >= 1000) ? 3 : (v >= 100) ? 2 : (v >= 10) ? 1 : 0;
-}
-
-//Counts number of bits
-exports.popCount = function(v) {
-  v = v - ((v >>> 1) & 0x55555555);
-  v = (v & 0x33333333) + ((v >>> 2) & 0x33333333);
-  return ((v + (v >>> 4) & 0xF0F0F0F) * 0x1010101) >>> 24;
-}
-
-//Counts number of trailing zeros
-function countTrailingZeros(v) {
-  var c = 32;
-  v &= -v;
-  if (v) c--;
-  if (v & 0x0000FFFF) c -= 16;
-  if (v & 0x00FF00FF) c -= 8;
-  if (v & 0x0F0F0F0F) c -= 4;
-  if (v & 0x33333333) c -= 2;
-  if (v & 0x55555555) c -= 1;
-  return c;
-}
-exports.countTrailingZeros = countTrailingZeros;
-
-//Rounds to next power of 2
-exports.nextPow2 = function(v) {
-  v += v === 0;
-  --v;
-  v |= v >>> 1;
-  v |= v >>> 2;
-  v |= v >>> 4;
-  v |= v >>> 8;
-  v |= v >>> 16;
-  return v + 1;
-}
-
-//Rounds down to previous power of 2
-exports.prevPow2 = function(v) {
-  v |= v >>> 1;
-  v |= v >>> 2;
-  v |= v >>> 4;
-  v |= v >>> 8;
-  v |= v >>> 16;
-  return v - (v>>>1);
-}
-
-//Computes parity of word
-exports.parity = function(v) {
-  v ^= v >>> 16;
-  v ^= v >>> 8;
-  v ^= v >>> 4;
-  v &= 0xf;
-  return (0x6996 >>> v) & 1;
-}
-
-var REVERSE_TABLE = new Array(256);
-
-(function(tab) {
-  for(var i=0; i<256; ++i) {
-    var v = i, r = i, s = 7;
-    for (v >>>= 1; v; v >>>= 1) {
-      r <<= 1;
-      r |= v & 1;
-      --s;
-    }
-    tab[i] = (r << s) & 0xff;
-  }
-})(REVERSE_TABLE);
-
-//Reverse bits in a 32 bit word
-exports.reverse = function(v) {
-  return  (REVERSE_TABLE[ v         & 0xff] << 24) |
-          (REVERSE_TABLE[(v >>> 8)  & 0xff] << 16) |
-          (REVERSE_TABLE[(v >>> 16) & 0xff] << 8)  |
-           REVERSE_TABLE[(v >>> 24) & 0xff];
-}
-
-//Interleave bits of 2 coordinates with 16 bits.  Useful for fast quadtree codes
-exports.interleave2 = function(x, y) {
-  x &= 0xFFFF;
-  x = (x | (x << 8)) & 0x00FF00FF;
-  x = (x | (x << 4)) & 0x0F0F0F0F;
-  x = (x | (x << 2)) & 0x33333333;
-  x = (x | (x << 1)) & 0x55555555;
-
-  y &= 0xFFFF;
-  y = (y | (y << 8)) & 0x00FF00FF;
-  y = (y | (y << 4)) & 0x0F0F0F0F;
-  y = (y | (y << 2)) & 0x33333333;
-  y = (y | (y << 1)) & 0x55555555;
-
-  return x | (y << 1);
-}
-
-//Extracts the nth interleaved component
-exports.deinterleave2 = function(v, n) {
-  v = (v >>> n) & 0x55555555;
-  v = (v | (v >>> 1))  & 0x33333333;
-  v = (v | (v >>> 2))  & 0x0F0F0F0F;
-  v = (v | (v >>> 4))  & 0x00FF00FF;
-  v = (v | (v >>> 16)) & 0x000FFFF;
-  return (v << 16) >> 16;
-}
-
-
-//Interleave bits of 3 coordinates, each with 10 bits.  Useful for fast octree codes
-exports.interleave3 = function(x, y, z) {
-  x &= 0x3FF;
-  x  = (x | (x<<16)) & 4278190335;
-  x  = (x | (x<<8))  & 251719695;
-  x  = (x | (x<<4))  & 3272356035;
-  x  = (x | (x<<2))  & 1227133513;
-
-  y &= 0x3FF;
-  y  = (y | (y<<16)) & 4278190335;
-  y  = (y | (y<<8))  & 251719695;
-  y  = (y | (y<<4))  & 3272356035;
-  y  = (y | (y<<2))  & 1227133513;
-  x |= (y << 1);
+function createThunk(proc) {
+  var code = ["'use strict'", "var CACHED={}"]
+  var vars = []
+  var thunkName = proc.funcName + "_cwise_thunk"
   
-  z &= 0x3FF;
-  z  = (z | (z<<16)) & 4278190335;
-  z  = (z | (z<<8))  & 251719695;
-  z  = (z | (z<<4))  & 3272356035;
-  z  = (z | (z<<2))  & 1227133513;
+  //Build thunk
+  code.push(["return function ", thunkName, "(", proc.shimArgs.join(","), "){"].join(""))
+  var typesig = []
+  var string_typesig = []
+  var proc_args = [["array",proc.arrayArgs[0],".shape"].join("")]
+  for(var i=0; i<proc.arrayArgs.length; ++i) {
+    var j = proc.arrayArgs[i]
+    vars.push(["t", j, "=array", j, ".dtype,",
+               "r", j, "=array", j, ".order"].join(""))
+    typesig.push("t" + j)
+    typesig.push("r" + j)
+    string_typesig.push("t"+j)
+    string_typesig.push("r"+j+".join()")
+    proc_args.push("array" + j + ".data")
+    proc_args.push("array" + j + ".stride")
+    proc_args.push("array" + j + ".offset|0")
+  }
+  for(var i=0; i<proc.scalarArgs.length; ++i) {
+    proc_args.push("scalar" + proc.scalarArgs[i])
+  }
+  vars.push(["type=[", string_typesig.join(","), "].join()"].join(""))
+  vars.push("proc=CACHED[type]")
+  code.push("var " + vars.join(","))
   
-  return x | (z << 2);
+  code.push(["if(!proc){",
+             "CACHED[type]=proc=compile([", typesig.join(","), "])}",
+             "return proc(", proc_args.join(","), ")}"].join(""))
+
+  if(proc.debug) {
+    console.log("Generated thunk:", code.join("\n"))
+  }
+  
+  //Compile thunk
+  var thunk = new Function("compile", code.join("\n"))
+  return thunk(compile.bind(undefined, proc))
 }
 
-//Extracts nth interleaved component of a 3-tuple
-exports.deinterleave3 = function(v, n) {
-  v = (v >>> n)       & 1227133513;
-  v = (v | (v>>>2))   & 3272356035;
-  v = (v | (v>>>4))   & 251719695;
-  v = (v | (v>>>8))   & 4278190335;
-  v = (v | (v>>>16))  & 0x3FF;
-  return (v<<22)>>22;
-}
+module.exports = createThunk
 
-//Computes next combination in colexicographic order (this is mistakenly called nextPermutation on the bit twiddling hacks page)
-exports.nextCombination = function(v) {
-  var t = v | (v - 1);
-  return (t + 1) | (((~t & -~t) - 1) >>> (countTrailingZeros(v) + 1));
-}
-
-
-},{}],114:[function(require,module,exports){
-(function(){/* (The MIT License)
- *
- * Copyright (c) 2012 Brandon Benvie <http://bbenvie.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
- * associated documentation files (the 'Software'), to deal in the Software without restriction,
- * including without limitation the rights to use, copy, modify, merge, publish, distribute,
- * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included with all copies or
- * substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
- * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  CLAIM,
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-
-// Original WeakMap implementation by Gozala @ https://gist.github.com/1269991
-// Updated and bugfixed by Raynos @ https://gist.github.com/1638059
-// Expanded by Benvie @ https://github.com/Benvie/harmony-collections
-
-void function(global, undefined_, undefined){
-  var getProps = Object.getOwnPropertyNames,
-      defProp  = Object.defineProperty,
-      toSource = Function.prototype.toString,
-      create   = Object.create,
-      hasOwn   = Object.prototype.hasOwnProperty,
-      funcName = /^\n?function\s?(\w*)?_?\(/;
-
-
-  function define(object, key, value){
-    if (typeof key === 'function') {
-      value = key;
-      key = nameOf(value).replace(/_$/, '');
-    }
-    return defProp(object, key, { configurable: true, writable: true, value: value });
-  }
-
-  function nameOf(func){
-    return typeof func !== 'function'
-          ? '' : 'name' in func
-          ? func.name : toSource.call(func).match(funcName)[1];
-  }
-
-  // ############
-  // ### Data ###
-  // ############
-
-  var Data = (function(){
-    var dataDesc = { value: { writable: true, value: undefined } },
-        datalock = 'return function(k){if(k===s)return l}',
-        uids     = create(null),
-
-        createUID = function(){
-          var key = Math.random().toString(36).slice(2);
-          return key in uids ? createUID() : uids[key] = key;
-        },
-
-        globalID = createUID(),
-
-        storage = function(obj){
-          if (hasOwn.call(obj, globalID))
-            return obj[globalID];
-
-          if (!Object.isExtensible(obj))
-            throw new TypeError("Object must be extensible");
-
-          var store = create(null);
-          defProp(obj, globalID, { value: store });
-          return store;
-        };
-
-    // common per-object storage area made visible by patching getOwnPropertyNames'
-    define(Object, function getOwnPropertyNames(obj){
-      var props = getProps(obj);
-      if (hasOwn.call(obj, globalID))
-        props.splice(props.indexOf(globalID), 1);
-      return props;
-    });
-
-    function Data(){
-      var puid = createUID(),
-          secret = {};
-
-      this.unlock = function(obj){
-        var store = storage(obj);
-        if (hasOwn.call(store, puid))
-          return store[puid](secret);
-
-        var data = create(null, dataDesc);
-        defProp(store, puid, {
-          value: new Function('s', 'l', datalock)(secret, data)
-        });
-        return data;
-      }
-    }
-
-    define(Data.prototype, function get(o){ return this.unlock(o).value });
-    define(Data.prototype, function set(o, v){ this.unlock(o).value = v });
-
-    return Data;
-  }());
-
-
-  var WM = (function(data){
-    var validate = function(key){
-      if (key == null || typeof key !== 'object' && typeof key !== 'function')
-        throw new TypeError("Invalid WeakMap key");
-    }
-
-    var wrap = function(collection, value){
-      var store = data.unlock(collection);
-      if (store.value)
-        throw new TypeError("Object is already a WeakMap");
-      store.value = value;
-    }
-
-    var unwrap = function(collection){
-      var storage = data.unlock(collection).value;
-      if (!storage)
-        throw new TypeError("WeakMap is not generic");
-      return storage;
-    }
-
-    var initialize = function(weakmap, iterable){
-      if (iterable !== null && typeof iterable === 'object' && typeof iterable.forEach === 'function') {
-        iterable.forEach(function(item, i){
-          if (item instanceof Array && item.length === 2)
-            set.call(weakmap, iterable[i][0], iterable[i][1]);
-        });
-      }
-    }
-
-
-    function WeakMap(iterable){
-      if (this === global || this == null || this === WeakMap.prototype)
-        return new WeakMap(iterable);
-
-      wrap(this, new Data);
-      initialize(this, iterable);
-    }
-
-    function get(key){
-      validate(key);
-      var value = unwrap(this).get(key);
-      return value === undefined_ ? undefined : value;
-    }
-
-    function set(key, value){
-      validate(key);
-      // store a token for explicit undefined so that "has" works correctly
-      unwrap(this).set(key, value === undefined ? undefined_ : value);
-    }
-
-    function has(key){
-      validate(key);
-      return unwrap(this).get(key) !== undefined;
-    }
-
-    function delete_(key){
-      validate(key);
-      var data = unwrap(this),
-          had = data.get(key) !== undefined;
-      data.set(key, undefined);
-      return had;
-    }
-
-    function toString(){
-      unwrap(this);
-      return '[object WeakMap]';
-    }
-
-    try {
-      var src = ('return '+delete_).replace('e_', '\\u0065'),
-          del = new Function('unwrap', 'validate', src)(unwrap, validate);
-    } catch (e) {
-      var del = delete_;
-    }
-
-    var src = (''+Object).split('Object');
-    var stringifier = function toString(){
-      return src[0] + nameOf(this) + src[1];
-    };
-
-    define(stringifier, stringifier);
-
-    var prep = { __proto__: [] } instanceof Array
-      ? function(f){ f.__proto__ = stringifier }
-      : function(f){ define(f, stringifier) };
-
-    prep(WeakMap);
-
-    [toString, get, set, has, del].forEach(function(method){
-      define(WeakMap.prototype, method);
-      prep(method);
-    });
-
-    return WeakMap;
-  }(new Data));
-
-  var defaultCreator = Object.create
-    ? function(){ return Object.create(null) }
-    : function(){ return {} };
-
-  function createStorage(creator){
-    var weakmap = new WM;
-    creator || (creator = defaultCreator);
-
-    function storage(object, value){
-      if (value || arguments.length === 2) {
-        weakmap.set(object, value);
-      } else {
-        value = weakmap.get(object);
-        if (value === undefined) {
-          value = creator(object);
-          weakmap.set(object, value);
-        }
-      }
-      return value;
-    }
-
-    return storage;
-  }
-
-
-  if (typeof module !== 'undefined') {
-    module.exports = WM;
-  } else if (typeof exports !== 'undefined') {
-    exports.WeakMap = WM;
-  } else if (!('WeakMap' in global)) {
-    global.WeakMap = WM;
-  }
-
-  WM.createStorage = createStorage;
-  if (global.WeakMap)
-    global.WeakMap.createStorage = createStorage;
-}((0, eval)('this'));
-
-})()
-},{}],115:[function(require,module,exports){
-(function(){/* (The MIT License)
- *
- * Copyright (c) 2012 Brandon Benvie <http://bbenvie.com>
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
- * associated documentation files (the 'Software'), to deal in the Software without restriction,
- * including without limitation the rights to use, copy, modify, merge, publish, distribute,
- * sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included with all copies or
- * substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING
- * BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
- * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY  CLAIM,
- * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-
-// Original WeakMap implementation by Gozala @ https://gist.github.com/1269991
-// Updated and bugfixed by Raynos @ https://gist.github.com/1638059
-// Expanded by Benvie @ https://github.com/Benvie/harmony-collections
-
-void function(global, undefined_, undefined){
-  var getProps = Object.getOwnPropertyNames,
-      defProp  = Object.defineProperty,
-      toSource = Function.prototype.toString,
-      create   = Object.create,
-      hasOwn   = Object.prototype.hasOwnProperty,
-      funcName = /^\n?function\s?(\w*)?_?\(/;
-
-
-  function define(object, key, value){
-    if (typeof key === 'function') {
-      value = key;
-      key = nameOf(value).replace(/_$/, '');
-    }
-    return defProp(object, key, { configurable: true, writable: true, value: value });
-  }
-
-  function nameOf(func){
-    return typeof func !== 'function'
-          ? '' : 'name' in func
-          ? func.name : toSource.call(func).match(funcName)[1];
-  }
-
-  // ############
-  // ### Data ###
-  // ############
-
-  var Data = (function(){
-    var dataDesc = { value: { writable: true, value: undefined } },
-        datalock = 'return function(k){if(k===s)return l}',
-        uids     = create(null),
-
-        createUID = function(){
-          var key = Math.random().toString(36).slice(2);
-          return key in uids ? createUID() : uids[key] = key;
-        },
-
-        globalID = createUID(),
-
-        storage = function(obj){
-          if (hasOwn.call(obj, globalID))
-            return obj[globalID];
-
-          if (!Object.isExtensible(obj))
-            throw new TypeError("Object must be extensible");
-
-          var store = create(null);
-          defProp(obj, globalID, { value: store });
-          return store;
-        };
-
-    // common per-object storage area made visible by patching getOwnPropertyNames'
-    define(Object, function getOwnPropertyNames(obj){
-      var props = getProps(obj);
-      if (hasOwn.call(obj, globalID))
-        props.splice(props.indexOf(globalID), 1);
-      return props;
-    });
-
-    function Data(){
-      var puid = createUID(),
-          secret = {};
-
-      this.unlock = function(obj){
-        var store = storage(obj);
-        if (hasOwn.call(store, puid))
-          return store[puid](secret);
-
-        var data = create(null, dataDesc);
-        defProp(store, puid, {
-          value: new Function('s', 'l', datalock)(secret, data)
-        });
-        return data;
-      }
-    }
-
-    define(Data.prototype, function get(o){ return this.unlock(o).value });
-    define(Data.prototype, function set(o, v){ this.unlock(o).value = v });
-
-    return Data;
-  }());
-
-
-  var WM = (function(data){
-    var validate = function(key){
-      if (key == null || typeof key !== 'object' && typeof key !== 'function')
-        throw new TypeError("Invalid WeakMap key");
-    }
-
-    var wrap = function(collection, value){
-      var store = data.unlock(collection);
-      if (store.value)
-        throw new TypeError("Object is already a WeakMap");
-      store.value = value;
-    }
-
-    var unwrap = function(collection){
-      var storage = data.unlock(collection).value;
-      if (!storage)
-        throw new TypeError("WeakMap is not generic");
-      return storage;
-    }
-
-    var initialize = function(weakmap, iterable){
-      if (iterable !== null && typeof iterable === 'object' && typeof iterable.forEach === 'function') {
-        iterable.forEach(function(item, i){
-          if (item instanceof Array && item.length === 2)
-            set.call(weakmap, iterable[i][0], iterable[i][1]);
-        });
-      }
-    }
-
-
-    function WeakMap(iterable){
-      if (this === global || this == null || this === WeakMap.prototype)
-        return new WeakMap(iterable);
-
-      wrap(this, new Data);
-      initialize(this, iterable);
-    }
-
-    function get(key){
-      validate(key);
-      var value = unwrap(this).get(key);
-      return value === undefined_ ? undefined : value;
-    }
-
-    function set(key, value){
-      validate(key);
-      // store a token for explicit undefined so that "has" works correctly
-      unwrap(this).set(key, value === undefined ? undefined_ : value);
-    }
-
-    function has(key){
-      validate(key);
-      return unwrap(this).get(key) !== undefined;
-    }
-
-    function delete_(key){
-      validate(key);
-      var data = unwrap(this),
-          had = data.get(key) !== undefined;
-      data.set(key, undefined);
-      return had;
-    }
-
-    function toString(){
-      unwrap(this);
-      return '[object WeakMap]';
-    }
-
-    try {
-      var src = ('return '+delete_).replace('e_', '\\u0065'),
-          del = new Function('unwrap', 'validate', src)(unwrap, validate);
-    } catch (e) {
-      var del = delete_;
-    }
-
-    var src = (''+Object).split('Object');
-    var stringifier = function toString(){
-      return src[0] + nameOf(this) + src[1];
-    };
-
-    define(stringifier, stringifier);
-
-    var prep = { __proto__: [] } instanceof Array
-      ? function(f){ f.__proto__ = stringifier }
-      : function(f){ define(f, stringifier) };
-
-    prep(WeakMap);
-
-    [toString, get, set, has, del].forEach(function(method){
-      define(WeakMap.prototype, method);
-      prep(method);
-    });
-
-    return WeakMap;
-  }(new Data));
-
-  var defaultCreator = Object.create
-    ? function(){ return Object.create(null) }
-    : function(){ return {} };
-
-  function createStorage(creator){
-    var weakmap = new WM;
-    creator || (creator = defaultCreator);
-
-    function storage(object, value){
-      if (value || arguments.length === 2) {
-        weakmap.set(object, value);
-      } else {
-        value = weakmap.get(object);
-        if (value === undefined) {
-          value = creator(object);
-          weakmap.set(object, value);
-        }
-      }
-      return value;
-    }
-
-    return storage;
-  }
-
-
-  if (typeof module !== 'undefined') {
-    module.exports = WM;
-  } else if (typeof exports !== 'undefined') {
-    exports.WeakMap = WM;
-  } else if (!('WeakMap' in global)) {
-    global.WeakMap = WM;
-  }
-
-  WM.createStorage = createStorage;
-  if (global.WeakMap)
-    global.WeakMap.createStorage = createStorage;
-}((0, eval)('this'));
-
-})()
-},{}],116:[function(require,module,exports){
+},{"./compile.js":130}],113:[function(require,module,exports){
 /**
  * Bit twiddling hacks for JavaScript.
  *
@@ -21321,6 +21105,22 @@ function dupe(count, value) {
 }
 
 module.exports = dupe
+},{}],115:[function(require,module,exports){
+"use strict"
+
+function bisect(pred, lo, hi, tol) {
+  tol = tol || 1e-8
+  while(hi-lo>tol) {
+    var m = (hi+lo)/2
+    if(pred(m)) {
+      hi = m
+    } else {
+      lo = m
+    }
+  }
+  return lo
+}
+module.exports = bisect
 },{}],119:[function(require,module,exports){
 (function(){/* (The MIT License)
  *
@@ -21564,7 +21364,7 @@ void function(global, undefined_, undefined){
 }((0, eval)('this'));
 
 })()
-},{}],123:[function(require,module,exports){
+},{}],118:[function(require,module,exports){
 /**
  * Bit twiddling hacks for JavaScript.
  *
@@ -21770,7 +21570,213 @@ exports.nextCombination = function(v) {
 }
 
 
-},{}],124:[function(require,module,exports){
+},{}],122:[function(require,module,exports){
+/**
+ * Bit twiddling hacks for JavaScript.
+ *
+ * Author: Mikola Lysenko
+ *
+ * Ported from Stanford bit twiddling hack library:
+ *    http://graphics.stanford.edu/~seander/bithacks.html
+ */
+
+"use strict"; "use restrict";
+
+//Number of bits in an integer
+var INT_BITS = 32;
+
+//Constants
+exports.INT_BITS  = INT_BITS;
+exports.INT_MAX   =  0x7fffffff;
+exports.INT_MIN   = -1<<(INT_BITS-1);
+
+//Returns -1, 0, +1 depending on sign of x
+exports.sign = function(v) {
+  return (v > 0) - (v < 0);
+}
+
+//Computes absolute value of integer
+exports.abs = function(v) {
+  var mask = v >> (INT_BITS-1);
+  return (v ^ mask) - mask;
+}
+
+//Computes minimum of integers x and y
+exports.min = function(x, y) {
+  return y ^ ((x ^ y) & -(x < y));
+}
+
+//Computes maximum of integers x and y
+exports.max = function(x, y) {
+  return x ^ ((x ^ y) & -(x < y));
+}
+
+//Checks if a number is a power of two
+exports.isPow2 = function(v) {
+  return !(v & (v-1)) && (!!v);
+}
+
+//Computes log base 2 of v
+exports.log2 = function(v) {
+  var r, shift;
+  r =     (v > 0xFFFF) << 4; v >>>= r;
+  shift = (v > 0xFF  ) << 3; v >>>= shift; r |= shift;
+  shift = (v > 0xF   ) << 2; v >>>= shift; r |= shift;
+  shift = (v > 0x3   ) << 1; v >>>= shift; r |= shift;
+  return r | (v >> 1);
+}
+
+//Computes log base 10 of v
+exports.log10 = function(v) {
+  return  (v >= 1000000000) ? 9 : (v >= 100000000) ? 8 : (v >= 10000000) ? 7 :
+          (v >= 1000000) ? 6 : (v >= 100000) ? 5 : (v >= 10000) ? 4 :
+          (v >= 1000) ? 3 : (v >= 100) ? 2 : (v >= 10) ? 1 : 0;
+}
+
+//Counts number of bits
+exports.popCount = function(v) {
+  v = v - ((v >>> 1) & 0x55555555);
+  v = (v & 0x33333333) + ((v >>> 2) & 0x33333333);
+  return ((v + (v >>> 4) & 0xF0F0F0F) * 0x1010101) >>> 24;
+}
+
+//Counts number of trailing zeros
+function countTrailingZeros(v) {
+  var c = 32;
+  v &= -v;
+  if (v) c--;
+  if (v & 0x0000FFFF) c -= 16;
+  if (v & 0x00FF00FF) c -= 8;
+  if (v & 0x0F0F0F0F) c -= 4;
+  if (v & 0x33333333) c -= 2;
+  if (v & 0x55555555) c -= 1;
+  return c;
+}
+exports.countTrailingZeros = countTrailingZeros;
+
+//Rounds to next power of 2
+exports.nextPow2 = function(v) {
+  v += v === 0;
+  --v;
+  v |= v >>> 1;
+  v |= v >>> 2;
+  v |= v >>> 4;
+  v |= v >>> 8;
+  v |= v >>> 16;
+  return v + 1;
+}
+
+//Rounds down to previous power of 2
+exports.prevPow2 = function(v) {
+  v |= v >>> 1;
+  v |= v >>> 2;
+  v |= v >>> 4;
+  v |= v >>> 8;
+  v |= v >>> 16;
+  return v - (v>>>1);
+}
+
+//Computes parity of word
+exports.parity = function(v) {
+  v ^= v >>> 16;
+  v ^= v >>> 8;
+  v ^= v >>> 4;
+  v &= 0xf;
+  return (0x6996 >>> v) & 1;
+}
+
+var REVERSE_TABLE = new Array(256);
+
+(function(tab) {
+  for(var i=0; i<256; ++i) {
+    var v = i, r = i, s = 7;
+    for (v >>>= 1; v; v >>>= 1) {
+      r <<= 1;
+      r |= v & 1;
+      --s;
+    }
+    tab[i] = (r << s) & 0xff;
+  }
+})(REVERSE_TABLE);
+
+//Reverse bits in a 32 bit word
+exports.reverse = function(v) {
+  return  (REVERSE_TABLE[ v         & 0xff] << 24) |
+          (REVERSE_TABLE[(v >>> 8)  & 0xff] << 16) |
+          (REVERSE_TABLE[(v >>> 16) & 0xff] << 8)  |
+           REVERSE_TABLE[(v >>> 24) & 0xff];
+}
+
+//Interleave bits of 2 coordinates with 16 bits.  Useful for fast quadtree codes
+exports.interleave2 = function(x, y) {
+  x &= 0xFFFF;
+  x = (x | (x << 8)) & 0x00FF00FF;
+  x = (x | (x << 4)) & 0x0F0F0F0F;
+  x = (x | (x << 2)) & 0x33333333;
+  x = (x | (x << 1)) & 0x55555555;
+
+  y &= 0xFFFF;
+  y = (y | (y << 8)) & 0x00FF00FF;
+  y = (y | (y << 4)) & 0x0F0F0F0F;
+  y = (y | (y << 2)) & 0x33333333;
+  y = (y | (y << 1)) & 0x55555555;
+
+  return x | (y << 1);
+}
+
+//Extracts the nth interleaved component
+exports.deinterleave2 = function(v, n) {
+  v = (v >>> n) & 0x55555555;
+  v = (v | (v >>> 1))  & 0x33333333;
+  v = (v | (v >>> 2))  & 0x0F0F0F0F;
+  v = (v | (v >>> 4))  & 0x00FF00FF;
+  v = (v | (v >>> 16)) & 0x000FFFF;
+  return (v << 16) >> 16;
+}
+
+
+//Interleave bits of 3 coordinates, each with 10 bits.  Useful for fast octree codes
+exports.interleave3 = function(x, y, z) {
+  x &= 0x3FF;
+  x  = (x | (x<<16)) & 4278190335;
+  x  = (x | (x<<8))  & 251719695;
+  x  = (x | (x<<4))  & 3272356035;
+  x  = (x | (x<<2))  & 1227133513;
+
+  y &= 0x3FF;
+  y  = (y | (y<<16)) & 4278190335;
+  y  = (y | (y<<8))  & 251719695;
+  y  = (y | (y<<4))  & 3272356035;
+  y  = (y | (y<<2))  & 1227133513;
+  x |= (y << 1);
+  
+  z &= 0x3FF;
+  z  = (z | (z<<16)) & 4278190335;
+  z  = (z | (z<<8))  & 251719695;
+  z  = (z | (z<<4))  & 3272356035;
+  z  = (z | (z<<2))  & 1227133513;
+  
+  return x | (z << 2);
+}
+
+//Extracts nth interleaved component of a 3-tuple
+exports.deinterleave3 = function(v, n) {
+  v = (v >>> n)       & 1227133513;
+  v = (v | (v>>>2))   & 3272356035;
+  v = (v | (v>>>4))   & 251719695;
+  v = (v | (v>>>8))   & 4278190335;
+  v = (v | (v>>>16))  & 0x3FF;
+  return (v<<22)>>22;
+}
+
+//Computes next combination in colexicographic order (this is mistakenly called nextPermutation on the bit twiddling hacks page)
+exports.nextCombination = function(v) {
+  var t = v | (v - 1);
+  return (t + 1) | (((~t & -~t) - 1) >>> (countTrailingZeros(v) + 1));
+}
+
+
+},{}],123:[function(require,module,exports){
 "use strict"
 
 function dupe_array(count, value, i) {
@@ -21820,54 +21826,7 @@ function dupe(count, value) {
 }
 
 module.exports = dupe
-},{}],125:[function(require,module,exports){
-"use strict"
-
-module.exports = findBasis
-
-function findBasis(up) {
-  var z = [ up[0], up[1], up[2] ]
-  var zl = z[0] * z[0] + z[1] * z[1] + z[2] * z[2]
-  if(zl < 1e-8) {
-    return [[1, 0, 0], [0,1,0], [0, 0, 1]]
-  } else {
-    zl = Math.sqrt(zl)
-    z[0] /= zl
-    z[1] /= zl
-    z[2] /= zl
-  }
-  var y
-  while(true) {
-    y = [ Math.random(), Math.random(), Math.random() ]
-    var d = y[0] * z[0] + y[1] * z[1] + y[2] * z[2]
-    var m = d * d
-    if(m < 0.1 || m > 0.5) {
-      continue
-    }
-    y[0] -= d * z[0]
-    y[1] -= d * z[1]
-    y[2] -= d * z[2]
-    var d2 = Math.sqrt(y[0] * y[0] + y[1] * y[1] + y[2] * y[2])
-    y[0] /= d2
-    y[1] /= d2
-    y[2] /= d2
-    break
-  }
-  var x = [0,0,0]
-  var h = 0.0
-  for(var i=0; i<3; ++i) {
-    var u = (i + 1) % 3
-    var v = (i + 2) % 3
-    x[i] = y[u] * z[v] - y[v] * z[u]
-    h += x[i] * x[i]
-  }
-  h = Math.sqrt(h)
-  for(var i=0; i<3; ++i) {
-    x[i] /= h
-  }
-  return [x, y, z]
-}
-},{}],127:[function(require,module,exports){
+},{}],126:[function(require,module,exports){
 "use strict"
 
 module.exports = linearExpansionSum
@@ -22024,6 +21983,53 @@ function linearExpansionSum(e, f) {
   g.length = count
   return g
 }
+},{}],127:[function(require,module,exports){
+"use strict"
+
+module.exports = findBasis
+
+function findBasis(up) {
+  var z = [ up[0], up[1], up[2] ]
+  var zl = z[0] * z[0] + z[1] * z[1] + z[2] * z[2]
+  if(zl < 1e-8) {
+    return [[1, 0, 0], [0,1,0], [0, 0, 1]]
+  } else {
+    zl = Math.sqrt(zl)
+    z[0] /= zl
+    z[1] /= zl
+    z[2] /= zl
+  }
+  var y
+  while(true) {
+    y = [ Math.random(), Math.random(), Math.random() ]
+    var d = y[0] * z[0] + y[1] * z[1] + y[2] * z[2]
+    var m = d * d
+    if(m < 0.1 || m > 0.5) {
+      continue
+    }
+    y[0] -= d * z[0]
+    y[1] -= d * z[1]
+    y[2] -= d * z[2]
+    var d2 = Math.sqrt(y[0] * y[0] + y[1] * y[1] + y[2] * y[2])
+    y[0] /= d2
+    y[1] /= d2
+    y[2] /= d2
+    break
+  }
+  var x = [0,0,0]
+  var h = 0.0
+  for(var i=0; i<3; ++i) {
+    var u = (i + 1) % 3
+    var v = (i + 2) % 3
+    x[i] = y[u] * z[v] - y[v] * z[u]
+    h += x[i] * x[i]
+  }
+  h = Math.sqrt(h)
+  for(var i=0; i<3; ++i) {
+    x[i] /= h
+  }
+  return [x, y, z]
+}
 },{}],129:[function(require,module,exports){
 (function(process){var Stream = require('stream')
 
@@ -22135,7 +22141,56 @@ function through (write, end, opts) {
 
 
 })(require("__browserify_process"))
-},{"stream":45,"__browserify_process":33}],83:[function(require,module,exports){
+},{"stream":45,"__browserify_process":33}],107:[function(require,module,exports){
+"use strict"
+
+var compile = require("./compile.js")
+
+function createThunk(proc) {
+  var code = ["'use strict'", "var CACHED={}"]
+  var vars = []
+  var thunkName = proc.funcName + "_cwise_thunk"
+  
+  //Build thunk
+  code.push(["return function ", thunkName, "(", proc.shimArgs.join(","), "){"].join(""))
+  var typesig = []
+  var string_typesig = []
+  var proc_args = [["array",proc.arrayArgs[0],".shape"].join("")]
+  for(var i=0; i<proc.arrayArgs.length; ++i) {
+    var j = proc.arrayArgs[i]
+    vars.push(["t", j, "=array", j, ".dtype,",
+               "r", j, "=array", j, ".order"].join(""))
+    typesig.push("t" + j)
+    typesig.push("r" + j)
+    string_typesig.push("t"+j)
+    string_typesig.push("r"+j+".join()")
+    proc_args.push("array" + j + ".data")
+    proc_args.push("array" + j + ".stride")
+    proc_args.push("array" + j + ".offset|0")
+  }
+  for(var i=0; i<proc.scalarArgs.length; ++i) {
+    proc_args.push("scalar" + proc.scalarArgs[i])
+  }
+  vars.push(["type=[", string_typesig.join(","), "].join()"].join(""))
+  vars.push("proc=CACHED[type]")
+  code.push("var " + vars.join(","))
+  
+  code.push(["if(!proc){",
+             "CACHED[type]=proc=compile([", typesig.join(","), "])}",
+             "return proc(", proc_args.join(","), ")}"].join(""))
+
+  if(proc.debug) {
+    console.log("Generated thunk:", code.join("\n"))
+  }
+  
+  //Compile thunk
+  var thunk = new Function("compile", code.join("\n"))
+  return thunk(compile.bind(undefined, proc))
+}
+
+module.exports = createThunk
+
+},{"./compile.js":131}],89:[function(require,module,exports){
 "use strict"
 
 var uniq = require("uniq")
@@ -22419,56 +22474,7 @@ function generateCWiseOp(proc, typesig) {
   return f()
 }
 module.exports = generateCWiseOp
-},{"uniq":131}],107:[function(require,module,exports){
-"use strict"
-
-var compile = require("./compile.js")
-
-function createThunk(proc) {
-  var code = ["'use strict'", "var CACHED={}"]
-  var vars = []
-  var thunkName = proc.funcName + "_cwise_thunk"
-  
-  //Build thunk
-  code.push(["return function ", thunkName, "(", proc.shimArgs.join(","), "){"].join(""))
-  var typesig = []
-  var string_typesig = []
-  var proc_args = [["array",proc.arrayArgs[0],".shape"].join("")]
-  for(var i=0; i<proc.arrayArgs.length; ++i) {
-    var j = proc.arrayArgs[i]
-    vars.push(["t", j, "=array", j, ".dtype,",
-               "r", j, "=array", j, ".order"].join(""))
-    typesig.push("t" + j)
-    typesig.push("r" + j)
-    string_typesig.push("t"+j)
-    string_typesig.push("r"+j+".join()")
-    proc_args.push("array" + j + ".data")
-    proc_args.push("array" + j + ".stride")
-    proc_args.push("array" + j + ".offset|0")
-  }
-  for(var i=0; i<proc.scalarArgs.length; ++i) {
-    proc_args.push("scalar" + proc.scalarArgs[i])
-  }
-  vars.push(["type=[", string_typesig.join(","), "].join()"].join(""))
-  vars.push("proc=CACHED[type]")
-  code.push("var " + vars.join(","))
-  
-  code.push(["if(!proc){",
-             "CACHED[type]=proc=compile([", typesig.join(","), "])}",
-             "return proc(", proc_args.join(","), ")}"].join(""))
-
-  if(proc.debug) {
-    console.log("Generated thunk:", code.join("\n"))
-  }
-  
-  //Compile thunk
-  var thunk = new Function("compile", code.join("\n"))
-  return thunk(compile.bind(undefined, proc))
-}
-
-module.exports = createThunk
-
-},{"./compile.js":132}],111:[function(require,module,exports){
+},{"uniq":132}],114:[function(require,module,exports){
 "use strict"
 
 var createThunk = require("./lib/thunk.js")
@@ -22576,7 +22582,7 @@ function compileCwise(user_args) {
 
 module.exports = compileCwise
 
-},{"./lib/thunk.js":133}],118:[function(require,module,exports){
+},{"./lib/thunk.js":133}],116:[function(require,module,exports){
 "use strict"
 
 var createThunk = require("./lib/thunk.js")
@@ -22790,7 +22796,7 @@ function compileCwise(user_args) {
 
 module.exports = compileCwise
 
-},{"./lib/thunk.js":135}],122:[function(require,module,exports){
+},{"./lib/thunk.js":135}],124:[function(require,module,exports){
 "use strict"
 
 var createThunk = require("./lib/thunk.js")
@@ -22896,65 +22902,7 @@ function compileCwise(user_args) {
 
 module.exports = compileCwise
 
-},{"./lib/thunk.js":136}],131:[function(require,module,exports){
-"use strict"
-
-function unique_pred(list, compare) {
-  var ptr = 1
-    , len = list.length
-    , a=list[0], b=list[0]
-  for(var i=1; i<len; ++i) {
-    b = a
-    a = list[i]
-    if(compare(a, b)) {
-      if(i === ptr) {
-        ptr++
-        continue
-      }
-      list[ptr++] = a
-    }
-  }
-  list.length = ptr
-  return list
-}
-
-function unique_eq(list) {
-  var ptr = 1
-    , len = list.length
-    , a=list[0], b = list[0]
-  for(var i=1; i<len; ++i, b=a) {
-    b = a
-    a = list[i]
-    if(a !== b) {
-      if(i === ptr) {
-        ptr++
-        continue
-      }
-      list[ptr++] = a
-    }
-  }
-  list.length = ptr
-  return list
-}
-
-function unique(list, compare, sorted) {
-  if(list.length === 0) {
-    return []
-  }
-  if(compare) {
-    if(!sorted) {
-      list.sort(compare)
-    }
-    return unique_pred(list, compare)
-  }
-  if(!sorted) {
-    list.sort()
-  }
-  return unique_eq(list)
-}
-
-module.exports = unique
-},{}],128:[function(require,module,exports){
+},{"./lib/thunk.js":136}],128:[function(require,module,exports){
 (function(process,Buffer){// Copyright (c) 2012 Kuba Niegowski
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -23104,7 +23052,7 @@ PNG.prototype.bitblt = function(dst, sx, sy, w, h, dx, dy) {
 };
 
 })(require("__browserify_process"),require("__browserify_Buffer").Buffer)
-},{"util":47,"stream":45,"./parser":137,"./packer":138,"__browserify_process":33,"__browserify_Buffer":40}],103:[function(require,module,exports){
+},{"util":47,"stream":45,"./parser":137,"./packer":138,"__browserify_process":33,"__browserify_Buffer":44}],103:[function(require,module,exports){
 "use strict"
 
 var dup = require("dup")
@@ -23286,7 +23234,115 @@ function createUniformWrapper(gl, program, uniforms, locations) {
   }
 }
 
-},{"./reflect.js":105,"dup":139}],120:[function(require,module,exports){
+},{"./reflect.js":105,"dup":139}],132:[function(require,module,exports){
+"use strict"
+
+function unique_pred(list, compare) {
+  var ptr = 1
+    , len = list.length
+    , a=list[0], b=list[0]
+  for(var i=1; i<len; ++i) {
+    b = a
+    a = list[i]
+    if(compare(a, b)) {
+      if(i === ptr) {
+        ptr++
+        continue
+      }
+      list[ptr++] = a
+    }
+  }
+  list.length = ptr
+  return list
+}
+
+function unique_eq(list) {
+  var ptr = 1
+    , len = list.length
+    , a=list[0], b = list[0]
+  for(var i=1; i<len; ++i, b=a) {
+    b = a
+    a = list[i]
+    if(a !== b) {
+      if(i === ptr) {
+        ptr++
+        continue
+      }
+      list[ptr++] = a
+    }
+  }
+  list.length = ptr
+  return list
+}
+
+function unique(list, compare, sorted) {
+  if(list.length === 0) {
+    return []
+  }
+  if(compare) {
+    if(!sorted) {
+      list.sort(compare)
+    }
+    return unique_pred(list, compare)
+  }
+  if(!sorted) {
+    list.sort()
+  }
+  return unique_eq(list)
+}
+
+module.exports = unique
+},{}],139:[function(require,module,exports){
+"use strict"
+
+function dupe_array(count, value, i) {
+  var c = count[i]|0
+  if(c <= 0) {
+    return []
+  }
+  var result = new Array(c), j
+  if(i === count.length-1) {
+    for(j=0; j<c; ++j) {
+      result[j] = value
+    }
+  } else {
+    for(j=0; j<c; ++j) {
+      result[j] = dupe_array(count, value, i+1)
+    }
+  }
+  return result
+}
+
+function dupe_number(count, value) {
+  var result, i
+  result = new Array(count)
+  for(i=0; i<count; ++i) {
+    result[i] = value
+  }
+  return result
+}
+
+function dupe(count, value) {
+  if(typeof value === "undefined") {
+    value = 0
+  }
+  switch(typeof count) {
+    case "number":
+      if(count > 0) {
+        return dupe_number(count|0, value)
+      }
+    break
+    case "object":
+      if(typeof (count.length) === "number") {
+        return dupe_array(count, value, 0)
+      }
+    break
+  }
+  return []
+}
+
+module.exports = dupe
+},{}],120:[function(require,module,exports){
 "use strict"
 
 var esprima = require("esprima")
@@ -23482,57 +23538,7 @@ function preprocess(func) {
 }
 
 module.exports = preprocess
-},{"uniq":140,"esprima":141}],139:[function(require,module,exports){
-"use strict"
-
-function dupe_array(count, value, i) {
-  var c = count[i]|0
-  if(c <= 0) {
-    return []
-  }
-  var result = new Array(c), j
-  if(i === count.length-1) {
-    for(j=0; j<c; ++j) {
-      result[j] = value
-    }
-  } else {
-    for(j=0; j<c; ++j) {
-      result[j] = dupe_array(count, value, i+1)
-    }
-  }
-  return result
-}
-
-function dupe_number(count, value) {
-  var result, i
-  result = new Array(count)
-  for(i=0; i<count; ++i) {
-    result[i] = value
-  }
-  return result
-}
-
-function dupe(count, value) {
-  if(typeof value === "undefined") {
-    value = 0
-  }
-  switch(typeof count) {
-    case "number":
-      if(count > 0) {
-        return dupe_number(count|0, value)
-      }
-    break
-    case "object":
-      if(typeof (count.length) === "number") {
-        return dupe_array(count, value, 0)
-      }
-    break
-  }
-  return []
-}
-
-module.exports = dupe
-},{}],133:[function(require,module,exports){
+},{"uniq":140,"esprima":141}],133:[function(require,module,exports){
 "use strict"
 
 var compile = require("./compile.js")
@@ -23581,7 +23587,7 @@ function createThunk(proc) {
 
 module.exports = createThunk
 
-},{"./compile.js":142}],134:[function(require,module,exports){
+},{"./compile.js":142}],135:[function(require,module,exports){
 "use strict"
 
 var compile = require("./compile.js")
@@ -23630,7 +23636,7 @@ function createThunk(proc) {
 
 module.exports = createThunk
 
-},{"./compile.js":143}],135:[function(require,module,exports){
+},{"./compile.js":143}],134:[function(require,module,exports){
 "use strict"
 
 var compile = require("./compile.js")
@@ -23728,7 +23734,41 @@ function createThunk(proc) {
 
 module.exports = createThunk
 
-},{"./compile.js":145}],140:[function(require,module,exports){
+},{"./compile.js":145}],146:[function(require,module,exports){
+"use strict"
+
+module.exports = twoProduct
+
+var SPLITTER = +(Math.pow(2, 27) + 1.0)
+
+function twoProduct(a, b, result) {
+  var x = a * b
+
+  var c = SPLITTER * a
+  var abig = c - a
+  var ahi = c - abig
+  var alo = a - ahi
+
+  var d = SPLITTER * b
+  var bbig = d - b
+  var bhi = d - bbig
+  var blo = b - bhi
+
+  var err1 = x - (ahi * bhi)
+  var err2 = err1 - (alo * bhi)
+  var err3 = err2 - (ahi * blo)
+
+  var y = alo * blo - err3
+
+  if(result) {
+    result[0] = y
+    result[1] = x
+    return result
+  }
+
+  return [ y, x ]
+}
+},{}],140:[function(require,module,exports){
 "use strict"
 
 function unique_pred(list, compare) {
@@ -27697,41 +27737,7 @@ parseStatement: true, parseSourceElement: true */
 /* vim: set sw=4 ts=4 et tw=80 : */
 
 })()
-},{}],146:[function(require,module,exports){
-"use strict"
-
-module.exports = twoProduct
-
-var SPLITTER = +(Math.pow(2, 27) + 1.0)
-
-function twoProduct(a, b, result) {
-  var x = a * b
-
-  var c = SPLITTER * a
-  var abig = c - a
-  var ahi = c - abig
-  var alo = a - ahi
-
-  var d = SPLITTER * b
-  var bbig = d - b
-  var bhi = d - bbig
-  var blo = b - bhi
-
-  var err1 = x - (ahi * bhi)
-  var err2 = err1 - (alo * bhi)
-  var err3 = err2 - (ahi * blo)
-
-  var y = alo * blo - err3
-
-  if(result) {
-    result[0] = y
-    result[1] = x
-    return result
-  }
-
-  return [ y, x ]
-}
-},{}],126:[function(require,module,exports){
+},{}],125:[function(require,module,exports){
 "use strict"
 
 var twoProduct = require("two-product")
@@ -27746,7 +27752,7 @@ function robustDotProduct(a, b) {
   }
   return r
 }
-},{"two-product":146,"robust-sum":127}],137:[function(require,module,exports){
+},{"two-product":146,"robust-sum":126}],137:[function(require,module,exports){
 (function(Buffer){// Copyright (c) 2012 Kuba Niegowski
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -28108,7 +28114,7 @@ Parser.prototype._reverseFiltered = function(data, width, height) {
 };
 
 })(require("__browserify_Buffer").Buffer)
-},{"util":47,"zlib":147,"./crc":148,"./chunkstream":149,"./constants":150,"./filter":151,"__browserify_Buffer":40}],138:[function(require,module,exports){
+},{"util":47,"zlib":147,"./crc":148,"./chunkstream":149,"./constants":150,"./filter":151,"__browserify_Buffer":44}],138:[function(require,module,exports){
 (function(Buffer){// Copyright (c) 2012 Kuba Niegowski
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -28221,7 +28227,7 @@ Packer.prototype._packIEND = function() {
 };
 
 })(require("__browserify_Buffer").Buffer)
-},{"util":47,"stream":45,"zlib":147,"./filter":151,"./crc":148,"./constants":150,"__browserify_Buffer":40}],130:[function(require,module,exports){
+},{"util":47,"stream":45,"zlib":147,"./filter":151,"./crc":148,"./constants":150,"__browserify_Buffer":44}],130:[function(require,module,exports){
 "use strict"
 
 var uniq = require("uniq")
@@ -28630,267 +28636,7 @@ for (var i = 0; i < 256; i++) {
     crcTable[i] = c;
 }
 
-},{"util":47,"stream":45}],149:[function(require,module,exports){
-(function(Buffer){// Copyright (c) 2012 Kuba Niegowski
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
-
-'use strict';
-
-
-var util = require('util'),
-    Stream = require('stream');
-
-
-var ChunkStream = module.exports = function() {
-    Stream.call(this);
-
-    this._buffers = [];
-    this._buffered = 0;
-
-    this._reads = [];
-    this._paused = false;
-
-    this._encoding = 'utf8';
-    this.writable = true;
-};
-util.inherits(ChunkStream, Stream);
-
-
-ChunkStream.prototype.read = function(length, callback) {
-
-    this._reads.push({
-        length: Math.abs(length),  // if length < 0 then at most this length
-        allowLess: length < 0,
-        func: callback
-    });
-
-    this._process();
-
-    // its paused and there is not enought data then ask for more
-    if (this._paused && this._reads.length > 0) {
-        this._paused = false;
-
-        this.emit('drain');
-    }
-};
-
-ChunkStream.prototype.write = function(data, encoding) {
-
-    if (!this.writable) {
-        this.emit('error', new Error('Stream not writable'));
-        return false;
-    }
-
-    if (!Buffer.isBuffer(data))
-        data = new Buffer(data, encoding || this._encoding);
-
-    this._buffers.push(data);
-    this._buffered += data.length;
-
-    this._process();
-
-    // ok if there are no more read requests
-    if (this._reads && this._reads.length == 0)
-        this._paused = true;
-
-    return this.writable && !this._paused;
-};
-
-ChunkStream.prototype.end = function(data, encoding) {
-
-    if (data) this.write(data, encoding);
-
-    this.writable = false;
-
-    // already destroyed
-    if (!this._buffers) return;
-
-    // enqueue or handle end
-    if (this._buffers.length == 0) {
-        this._end();
-    } else {
-        this._buffers.push(null);
-        this._process();
-    }
-};
-
-ChunkStream.prototype.destroySoon = ChunkStream.prototype.end;
-
-ChunkStream.prototype._end = function() {
-
-    if (this._reads.length > 0) {
-        this.emit('error',
-            new Error('There are some read requests waitng on finished stream')
-        );
-    }
-
-    this.destroy();
-};
-
-ChunkStream.prototype.destroy = function() {
-
-    if (!this._buffers) return;
-
-    this.writable = false;
-    this._reads = null;
-    this._buffers = null;
-
-    this.emit('close');
-};
-
-ChunkStream.prototype._process = function() {
-
-    // as long as there is any data and read requests
-    while (this._buffered > 0 && this._reads && this._reads.length > 0) {
-
-        var read = this._reads[0];
-
-        // read any data (but no more than length)
-        if (read.allowLess) {
-
-            // ok there is any data so that we can satisfy this request
-            this._reads.shift(); // == read
-
-            // first we need to peek into first buffer
-            var buf = this._buffers[0];
-
-            // ok there is more data than we need
-            if (buf.length > read.length) {
-
-                this._buffered -= read.length;
-                this._buffers[0] = buf.slice(read.length);
-
-                read.func.call(this, buf.slice(0, read.length));
-
-            } else {
-                // ok this is less than maximum length so use it all
-                this._buffered -= buf.length;
-                this._buffers.shift(); // == buf
-
-                read.func.call(this, buf);
-            }
-
-        } else if (this._buffered >= read.length) {
-            // ok we can meet some expectations
-
-            this._reads.shift(); // == read
-
-            var pos = 0,
-                count = 0,
-                data = new Buffer(read.length);
-
-            // create buffer for all data
-            while (pos < read.length) {
-
-                var buf = this._buffers[count++],
-                    len = Math.min(buf.length, read.length - pos);
-
-                buf.copy(data, pos, 0, len);
-                pos += len;
-
-                // last buffer wasn't used all so just slice it and leave
-                if (len != buf.length)
-                    this._buffers[--count] = buf.slice(len);
-            }
-
-            // remove all used buffers
-            if (count > 0)
-                this._buffers.splice(0, count);
-
-            this._buffered -= read.length;
-
-            read.func.call(this, data);
-
-        } else {
-            // not enought data to satisfy first request in queue
-            // so we need to wait for more
-            break;
-        }
-    }
-
-    if (this._buffers && this._buffers.length > 0 && this._buffers[0] == null) {
-        this._end();
-    }
-};
-
-})(require("__browserify_Buffer").Buffer)
-},{"util":47,"stream":45,"__browserify_Buffer":40}],152:[function(require,module,exports){
-"use strict"
-
-function unique_pred(list, compare) {
-  var ptr = 1
-    , len = list.length
-    , a=list[0], b=list[0]
-  for(var i=1; i<len; ++i) {
-    b = a
-    a = list[i]
-    if(compare(a, b)) {
-      if(i === ptr) {
-        ptr++
-        continue
-      }
-      list[ptr++] = a
-    }
-  }
-  list.length = ptr
-  return list
-}
-
-function unique_eq(list) {
-  var ptr = 1
-    , len = list.length
-    , a=list[0], b = list[0]
-  for(var i=1; i<len; ++i, b=a) {
-    b = a
-    a = list[i]
-    if(a !== b) {
-      if(i === ptr) {
-        ptr++
-        continue
-      }
-      list[ptr++] = a
-    }
-  }
-  list.length = ptr
-  return list
-}
-
-function unique(list, compare, sorted) {
-  if(list.length === 0) {
-    return list
-  }
-  if(compare) {
-    if(!sorted) {
-      list.sort(compare)
-    }
-    return unique_pred(list, compare)
-  }
-  if(!sorted) {
-    list.sort()
-  }
-  return unique_eq(list)
-}
-
-module.exports = unique
-
-},{}],132:[function(require,module,exports){
+},{"util":47,"stream":45}],131:[function(require,module,exports){
 "use strict"
 
 var uniq = require("uniq")
@@ -29178,7 +28924,208 @@ function generateCWiseOp(proc, typesig) {
   return f()
 }
 module.exports = generateCWiseOp
-},{"uniq":153}],147:[function(require,module,exports){
+},{"uniq":153}],149:[function(require,module,exports){
+(function(Buffer){// Copyright (c) 2012 Kuba Niegowski
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+// THE SOFTWARE.
+
+'use strict';
+
+
+var util = require('util'),
+    Stream = require('stream');
+
+
+var ChunkStream = module.exports = function() {
+    Stream.call(this);
+
+    this._buffers = [];
+    this._buffered = 0;
+
+    this._reads = [];
+    this._paused = false;
+
+    this._encoding = 'utf8';
+    this.writable = true;
+};
+util.inherits(ChunkStream, Stream);
+
+
+ChunkStream.prototype.read = function(length, callback) {
+
+    this._reads.push({
+        length: Math.abs(length),  // if length < 0 then at most this length
+        allowLess: length < 0,
+        func: callback
+    });
+
+    this._process();
+
+    // its paused and there is not enought data then ask for more
+    if (this._paused && this._reads.length > 0) {
+        this._paused = false;
+
+        this.emit('drain');
+    }
+};
+
+ChunkStream.prototype.write = function(data, encoding) {
+
+    if (!this.writable) {
+        this.emit('error', new Error('Stream not writable'));
+        return false;
+    }
+
+    if (!Buffer.isBuffer(data))
+        data = new Buffer(data, encoding || this._encoding);
+
+    this._buffers.push(data);
+    this._buffered += data.length;
+
+    this._process();
+
+    // ok if there are no more read requests
+    if (this._reads && this._reads.length == 0)
+        this._paused = true;
+
+    return this.writable && !this._paused;
+};
+
+ChunkStream.prototype.end = function(data, encoding) {
+
+    if (data) this.write(data, encoding);
+
+    this.writable = false;
+
+    // already destroyed
+    if (!this._buffers) return;
+
+    // enqueue or handle end
+    if (this._buffers.length == 0) {
+        this._end();
+    } else {
+        this._buffers.push(null);
+        this._process();
+    }
+};
+
+ChunkStream.prototype.destroySoon = ChunkStream.prototype.end;
+
+ChunkStream.prototype._end = function() {
+
+    if (this._reads.length > 0) {
+        this.emit('error',
+            new Error('There are some read requests waitng on finished stream')
+        );
+    }
+
+    this.destroy();
+};
+
+ChunkStream.prototype.destroy = function() {
+
+    if (!this._buffers) return;
+
+    this.writable = false;
+    this._reads = null;
+    this._buffers = null;
+
+    this.emit('close');
+};
+
+ChunkStream.prototype._process = function() {
+
+    // as long as there is any data and read requests
+    while (this._buffered > 0 && this._reads && this._reads.length > 0) {
+
+        var read = this._reads[0];
+
+        // read any data (but no more than length)
+        if (read.allowLess) {
+
+            // ok there is any data so that we can satisfy this request
+            this._reads.shift(); // == read
+
+            // first we need to peek into first buffer
+            var buf = this._buffers[0];
+
+            // ok there is more data than we need
+            if (buf.length > read.length) {
+
+                this._buffered -= read.length;
+                this._buffers[0] = buf.slice(read.length);
+
+                read.func.call(this, buf.slice(0, read.length));
+
+            } else {
+                // ok this is less than maximum length so use it all
+                this._buffered -= buf.length;
+                this._buffers.shift(); // == buf
+
+                read.func.call(this, buf);
+            }
+
+        } else if (this._buffered >= read.length) {
+            // ok we can meet some expectations
+
+            this._reads.shift(); // == read
+
+            var pos = 0,
+                count = 0,
+                data = new Buffer(read.length);
+
+            // create buffer for all data
+            while (pos < read.length) {
+
+                var buf = this._buffers[count++],
+                    len = Math.min(buf.length, read.length - pos);
+
+                buf.copy(data, pos, 0, len);
+                pos += len;
+
+                // last buffer wasn't used all so just slice it and leave
+                if (len != buf.length)
+                    this._buffers[--count] = buf.slice(len);
+            }
+
+            // remove all used buffers
+            if (count > 0)
+                this._buffers.splice(0, count);
+
+            this._buffered -= read.length;
+
+            read.func.call(this, data);
+
+        } else {
+            // not enought data to satisfy first request in queue
+            // so we need to wait for more
+            break;
+        }
+    }
+
+    if (this._buffers && this._buffers.length > 0 && this._buffers[0] == null) {
+        this._end();
+    }
+};
+
+})(require("__browserify_Buffer").Buffer)
+},{"util":47,"stream":45,"__browserify_Buffer":44}],147:[function(require,module,exports){
 (function(Buffer){const Zlib = module.exports = require('./zlib');
 
 // the least I can do is make error messages for the rest of the node.js/zlib api.
@@ -29223,7 +29170,183 @@ Zlib.gzip = function gzip(stringOrBuffer, callback) {
   return _gzip(Buffer(stringOrBuffer), callback);
 };
 })(require("__browserify_Buffer").Buffer)
-},{"./zlib":154,"__browserify_Buffer":40}],151:[function(require,module,exports){
+},{"./zlib":154,"__browserify_Buffer":44}],152:[function(require,module,exports){
+"use strict"
+
+function unique_pred(list, compare) {
+  var ptr = 1
+    , len = list.length
+    , a=list[0], b=list[0]
+  for(var i=1; i<len; ++i) {
+    b = a
+    a = list[i]
+    if(compare(a, b)) {
+      if(i === ptr) {
+        ptr++
+        continue
+      }
+      list[ptr++] = a
+    }
+  }
+  list.length = ptr
+  return list
+}
+
+function unique_eq(list) {
+  var ptr = 1
+    , len = list.length
+    , a=list[0], b = list[0]
+  for(var i=1; i<len; ++i, b=a) {
+    b = a
+    a = list[i]
+    if(a !== b) {
+      if(i === ptr) {
+        ptr++
+        continue
+      }
+      list[ptr++] = a
+    }
+  }
+  list.length = ptr
+  return list
+}
+
+function unique(list, compare, sorted) {
+  if(list.length === 0) {
+    return list
+  }
+  if(compare) {
+    if(!sorted) {
+      list.sort(compare)
+    }
+    return unique_pred(list, compare)
+  }
+  if(!sorted) {
+    list.sort()
+  }
+  return unique_eq(list)
+}
+
+module.exports = unique
+
+},{}],153:[function(require,module,exports){
+"use strict"
+
+function unique_pred(list, compare) {
+  var ptr = 1
+    , len = list.length
+    , a=list[0], b=list[0]
+  for(var i=1; i<len; ++i) {
+    b = a
+    a = list[i]
+    if(compare(a, b)) {
+      if(i === ptr) {
+        ptr++
+        continue
+      }
+      list[ptr++] = a
+    }
+  }
+  list.length = ptr
+  return list
+}
+
+function unique_eq(list) {
+  var ptr = 1
+    , len = list.length
+    , a=list[0], b = list[0]
+  for(var i=1; i<len; ++i, b=a) {
+    b = a
+    a = list[i]
+    if(a !== b) {
+      if(i === ptr) {
+        ptr++
+        continue
+      }
+      list[ptr++] = a
+    }
+  }
+  list.length = ptr
+  return list
+}
+
+function unique(list, compare, sorted) {
+  if(list.length === 0) {
+    return list
+  }
+  if(compare) {
+    if(!sorted) {
+      list.sort(compare)
+    }
+    return unique_pred(list, compare)
+  }
+  if(!sorted) {
+    list.sort()
+  }
+  return unique_eq(list)
+}
+
+module.exports = unique
+
+},{}],154:[function(require,module,exports){
+(function(process,Buffer){/** @license zlib.js 2012 - imaya [ https://github.com/imaya/zlib.js ] The MIT License */
+(function() {'use strict';function m(c){throw c;}var r=void 0,u=!0;var B="undefined"!==typeof Uint8Array&&"undefined"!==typeof Uint16Array&&"undefined"!==typeof Uint32Array;function aa(c){if("string"===typeof c){var a=c.split(""),b,e;b=0;for(e=a.length;b<e;b++)a[b]=(a[b].charCodeAt(0)&255)>>>0;c=a}for(var f=1,d=0,g=c.length,h,j=0;0<g;){h=1024<g?1024:g;g-=h;do f+=c[j++],d+=f;while(--h);f%=65521;d%=65521}return(d<<16|f)>>>0};function I(c,a){this.index="number"===typeof a?a:0;this.n=0;this.buffer=c instanceof(B?Uint8Array:Array)?c:new (B?Uint8Array:Array)(32768);2*this.buffer.length<=this.index&&m(Error("invalid index"));this.buffer.length<=this.index&&this.f()}I.prototype.f=function(){var c=this.buffer,a,b=c.length,e=new (B?Uint8Array:Array)(b<<1);if(B)e.set(c);else for(a=0;a<b;++a)e[a]=c[a];return this.buffer=e};
+I.prototype.d=function(c,a,b){var e=this.buffer,f=this.index,d=this.n,g=e[f],h;b&&1<a&&(c=8<a?(K[c&255]<<24|K[c>>>8&255]<<16|K[c>>>16&255]<<8|K[c>>>24&255])>>32-a:K[c]>>8-a);if(8>a+d)g=g<<a|c,d+=a;else for(h=0;h<a;++h)g=g<<1|c>>a-h-1&1,8===++d&&(d=0,e[f++]=K[g],g=0,f===e.length&&(e=this.f()));e[f]=g;this.buffer=e;this.n=d;this.index=f};I.prototype.finish=function(){var c=this.buffer,a=this.index,b;0<this.n&&(c[a]<<=8-this.n,c[a]=K[c[a]],a++);B?b=c.subarray(0,a):(c.length=a,b=c);return b};
+var ba=new (B?Uint8Array:Array)(256),Q;for(Q=0;256>Q;++Q){for(var R=Q,ga=R,ha=7,R=R>>>1;R;R>>>=1)ga<<=1,ga|=R&1,--ha;ba[Q]=(ga<<ha&255)>>>0}var K=ba;var S={k:function(c,a,b){return S.update(c,0,a,b)},update:function(c,a,b,e){for(var f=S.L,d="number"===typeof b?b:b=0,g="number"===typeof e?e:c.length,a=a^4294967295,d=g&7;d--;++b)a=a>>>8^f[(a^c[b])&255];for(d=g>>3;d--;b+=8)a=a>>>8^f[(a^c[b])&255],a=a>>>8^f[(a^c[b+1])&255],a=a>>>8^f[(a^c[b+2])&255],a=a>>>8^f[(a^c[b+3])&255],a=a>>>8^f[(a^c[b+4])&255],a=a>>>8^f[(a^c[b+5])&255],a=a>>>8^f[(a^c[b+6])&255],a=a>>>8^f[(a^c[b+7])&255];return(a^4294967295)>>>0}},ia=S,ja,ka=[0,1996959894,3993919788,2567524794,
+124634137,1886057615,3915621685,2657392035,249268274,2044508324,3772115230,2547177864,162941995,2125561021,3887607047,2428444049,498536548,1789927666,4089016648,2227061214,450548861,1843258603,4107580753,2211677639,325883990,1684777152,4251122042,2321926636,335633487,1661365465,4195302755,2366115317,997073096,1281953886,3579855332,2724688242,1006888145,1258607687,3524101629,2768942443,901097722,1119000684,3686517206,2898065728,853044451,1172266101,3705015759,2882616665,651767980,1373503546,3369554304,
+3218104598,565507253,1454621731,3485111705,3099436303,671266974,1594198024,3322730930,2970347812,795835527,1483230225,3244367275,3060149565,1994146192,31158534,2563907772,4023717930,1907459465,112637215,2680153253,3904427059,2013776290,251722036,2517215374,3775830040,2137656763,141376813,2439277719,3865271297,1802195444,476864866,2238001368,4066508878,1812370925,453092731,2181625025,4111451223,1706088902,314042704,2344532202,4240017532,1658658271,366619977,2362670323,4224994405,1303535960,984961486,
+2747007092,3569037538,1256170817,1037604311,2765210733,3554079995,1131014506,879679996,2909243462,3663771856,1141124467,855842277,2852801631,3708648649,1342533948,654459306,3188396048,3373015174,1466479909,544179635,3110523913,3462522015,1591671054,702138776,2966460450,3352799412,1504918807,783551873,3082640443,3233442989,3988292384,2596254646,62317068,1957810842,3939845945,2647816111,81470997,1943803523,3814918930,2489596804,225274430,2053790376,3826175755,2466906013,167816743,2097651377,4027552580,
+2265490386,503444072,1762050814,4150417245,2154129355,426522225,1852507879,4275313526,2312317920,282753626,1742555852,4189708143,2394877945,397917763,1622183637,3604390888,2714866558,953729732,1340076626,3518719985,2797360999,1068828381,1219638859,3624741850,2936675148,906185462,1090812512,3747672003,2825379669,829329135,1181335161,3412177804,3160834842,628085408,1382605366,3423369109,3138078467,570562233,1426400815,3317316542,2998733608,733239954,1555261956,3268935591,3050360625,752459403,1541320221,
+2607071920,3965973030,1969922972,40735498,2617837225,3943577151,1913087877,83908371,2512341634,3803740692,2075208622,213261112,2463272603,3855990285,2094854071,198958881,2262029012,4057260610,1759359992,534414190,2176718541,4139329115,1873836001,414664567,2282248934,4279200368,1711684554,285281116,2405801727,4167216745,1634467795,376229701,2685067896,3608007406,1308918612,956543938,2808555105,3495958263,1231636301,1047427035,2932959818,3654703836,1088359270,936918E3,2847714899,3736837829,1202900863,
+817233897,3183342108,3401237130,1404277552,615818150,3134207493,3453421203,1423857449,601450431,3009837614,3294710456,1567103746,711928724,3020668471,3272380065,1510334235,755167117];ja=B?new Uint32Array(ka):ka;ia.L=ja;function na(){};function oa(c){this.buffer=new (B?Uint16Array:Array)(2*c);this.length=0}oa.prototype.getParent=function(c){return 2*((c-2)/4|0)};oa.prototype.push=function(c,a){var b,e,f=this.buffer,d;b=this.length;f[this.length++]=a;for(f[this.length++]=c;0<b;)if(e=this.getParent(b),f[b]>f[e])d=f[b],f[b]=f[e],f[e]=d,d=f[b+1],f[b+1]=f[e+1],f[e+1]=d,b=e;else break;return this.length};
+oa.prototype.pop=function(){var c,a,b=this.buffer,e,f,d;a=b[0];c=b[1];this.length-=2;b[0]=b[this.length];b[1]=b[this.length+1];for(d=0;;){f=2*d+2;if(f>=this.length)break;f+2<this.length&&b[f+2]>b[f]&&(f+=2);if(b[f]>b[d])e=b[d],b[d]=b[f],b[f]=e,e=b[d+1],b[d+1]=b[f+1],b[f+1]=e;else break;d=f}return{index:c,value:a,length:this.length}};function T(c){var a=c.length,b=0,e=Number.POSITIVE_INFINITY,f,d,g,h,j,i,q,l,k;for(l=0;l<a;++l)c[l]>b&&(b=c[l]),c[l]<e&&(e=c[l]);f=1<<b;d=new (B?Uint32Array:Array)(f);g=1;h=0;for(j=2;g<=b;){for(l=0;l<a;++l)if(c[l]===g){i=0;q=h;for(k=0;k<g;++k)i=i<<1|q&1,q>>=1;for(k=i;k<f;k+=j)d[k]=g<<16|l;++h}++g;h<<=1;j<<=1}return[d,b,e]};function pa(c,a){this.l=qa;this.F=0;this.input=c;this.b=0;a&&(a.lazy&&(this.F=a.lazy),"number"===typeof a.compressionType&&(this.l=a.compressionType),a.outputBuffer&&(this.a=B&&a.outputBuffer instanceof Array?new Uint8Array(a.outputBuffer):a.outputBuffer),"number"===typeof a.outputIndex&&(this.b=a.outputIndex));this.a||(this.a=new (B?Uint8Array:Array)(32768))}var qa=2,ra={NONE:0,K:1,u:qa,W:3},sa=[],U;
+for(U=0;288>U;U++)switch(u){case 143>=U:sa.push([U+48,8]);break;case 255>=U:sa.push([U-144+400,9]);break;case 279>=U:sa.push([U-256+0,7]);break;case 287>=U:sa.push([U-280+192,8]);break;default:m("invalid literal: "+U)}
+pa.prototype.h=function(){var c,a,b,e,f=this.input;switch(this.l){case 0:b=0;for(e=f.length;b<e;){a=B?f.subarray(b,b+65535):f.slice(b,b+65535);b+=a.length;var d=a,g=b===e,h=r,j=r,i=r,q=r,l=r,k=this.a,p=this.b;if(B){for(k=new Uint8Array(this.a.buffer);k.length<=p+d.length+5;)k=new Uint8Array(k.length<<1);k.set(this.a)}h=g?1:0;k[p++]=h|0;j=d.length;i=~j+65536&65535;k[p++]=j&255;k[p++]=j>>>8&255;k[p++]=i&255;k[p++]=i>>>8&255;if(B)k.set(d,p),p+=d.length,k=k.subarray(0,p);else{q=0;for(l=d.length;q<l;++q)k[p++]=
+d[q];k.length=p}this.b=p;this.a=k}break;case 1:var t=new I(new Uint8Array(this.a.buffer),this.b);t.d(1,1,u);t.d(1,2,u);var v=ta(this,f),x,F,w;x=0;for(F=v.length;x<F;x++)if(w=v[x],I.prototype.d.apply(t,sa[w]),256<w)t.d(v[++x],v[++x],u),t.d(v[++x],5),t.d(v[++x],v[++x],u);else if(256===w)break;this.a=t.finish();this.b=this.a.length;break;case qa:var A=new I(new Uint8Array(this.a),this.b),C,n,s,E,D,ca=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15],V,La,da,Ma,la,va=Array(19),Na,Z,ma,G,Oa;C=qa;A.d(1,
+1,u);A.d(C,2,u);n=ta(this,f);V=ua(this.T,15);La=wa(V);da=ua(this.S,7);Ma=wa(da);for(s=286;257<s&&0===V[s-1];s--);for(E=30;1<E&&0===da[E-1];E--);var Pa=s,Qa=E,M=new (B?Uint32Array:Array)(Pa+Qa),y,N,z,ea,L=new (B?Uint32Array:Array)(316),J,H,O=new (B?Uint8Array:Array)(19);for(y=N=0;y<Pa;y++)M[N++]=V[y];for(y=0;y<Qa;y++)M[N++]=da[y];if(!B){y=0;for(ea=O.length;y<ea;++y)O[y]=0}y=J=0;for(ea=M.length;y<ea;y+=N){for(N=1;y+N<ea&&M[y+N]===M[y];++N);z=N;if(0===M[y])if(3>z)for(;0<z--;)L[J++]=0,O[0]++;else for(;0<
+z;)H=138>z?z:138,H>z-3&&H<z&&(H=z-3),10>=H?(L[J++]=17,L[J++]=H-3,O[17]++):(L[J++]=18,L[J++]=H-11,O[18]++),z-=H;else if(L[J++]=M[y],O[M[y]]++,z--,3>z)for(;0<z--;)L[J++]=M[y],O[M[y]]++;else for(;0<z;)H=6>z?z:6,H>z-3&&H<z&&(H=z-3),L[J++]=16,L[J++]=H-3,O[16]++,z-=H}c=B?L.subarray(0,J):L.slice(0,J);la=ua(O,7);for(G=0;19>G;G++)va[G]=la[ca[G]];for(D=19;4<D&&0===va[D-1];D--);Na=wa(la);A.d(s-257,5,u);A.d(E-1,5,u);A.d(D-4,4,u);for(G=0;G<D;G++)A.d(va[G],3,u);G=0;for(Oa=c.length;G<Oa;G++)if(Z=c[G],A.d(Na[Z],
+la[Z],u),16<=Z){G++;switch(Z){case 16:ma=2;break;case 17:ma=3;break;case 18:ma=7;break;default:m("invalid code: "+Z)}A.d(c[G],ma,u)}var Ra=[La,V],Sa=[Ma,da],P,Ta,fa,ya,Ua,Va,Wa,Xa;Ua=Ra[0];Va=Ra[1];Wa=Sa[0];Xa=Sa[1];P=0;for(Ta=n.length;P<Ta;++P)if(fa=n[P],A.d(Ua[fa],Va[fa],u),256<fa)A.d(n[++P],n[++P],u),ya=n[++P],A.d(Wa[ya],Xa[ya],u),A.d(n[++P],n[++P],u);else if(256===fa)break;this.a=A.finish();this.b=this.a.length;break;default:m("invalid compression type")}return this.a};
+function xa(c,a){this.length=c;this.N=a}
+function za(){var c=Aa;switch(u){case 3===c:return[257,c-3,0];case 4===c:return[258,c-4,0];case 5===c:return[259,c-5,0];case 6===c:return[260,c-6,0];case 7===c:return[261,c-7,0];case 8===c:return[262,c-8,0];case 9===c:return[263,c-9,0];case 10===c:return[264,c-10,0];case 12>=c:return[265,c-11,1];case 14>=c:return[266,c-13,1];case 16>=c:return[267,c-15,1];case 18>=c:return[268,c-17,1];case 22>=c:return[269,c-19,2];case 26>=c:return[270,c-23,2];case 30>=c:return[271,c-27,2];case 34>=c:return[272,c-
+31,2];case 42>=c:return[273,c-35,3];case 50>=c:return[274,c-43,3];case 58>=c:return[275,c-51,3];case 66>=c:return[276,c-59,3];case 82>=c:return[277,c-67,4];case 98>=c:return[278,c-83,4];case 114>=c:return[279,c-99,4];case 130>=c:return[280,c-115,4];case 162>=c:return[281,c-131,5];case 194>=c:return[282,c-163,5];case 226>=c:return[283,c-195,5];case 257>=c:return[284,c-227,5];case 258===c:return[285,c-258,0];default:m("invalid length: "+c)}}var Ba=[],Aa,Ca;
+for(Aa=3;258>=Aa;Aa++)Ca=za(),Ba[Aa]=Ca[2]<<24|Ca[1]<<16|Ca[0];var Da=B?new Uint32Array(Ba):Ba;
+function ta(c,a){function b(a,c){var b=a.N,d=[],e=0,f;f=Da[a.length];d[e++]=f&65535;d[e++]=f>>16&255;d[e++]=f>>24;var g;switch(u){case 1===b:g=[0,b-1,0];break;case 2===b:g=[1,b-2,0];break;case 3===b:g=[2,b-3,0];break;case 4===b:g=[3,b-4,0];break;case 6>=b:g=[4,b-5,1];break;case 8>=b:g=[5,b-7,1];break;case 12>=b:g=[6,b-9,2];break;case 16>=b:g=[7,b-13,2];break;case 24>=b:g=[8,b-17,3];break;case 32>=b:g=[9,b-25,3];break;case 48>=b:g=[10,b-33,4];break;case 64>=b:g=[11,b-49,4];break;case 96>=b:g=[12,b-
+65,5];break;case 128>=b:g=[13,b-97,5];break;case 192>=b:g=[14,b-129,6];break;case 256>=b:g=[15,b-193,6];break;case 384>=b:g=[16,b-257,7];break;case 512>=b:g=[17,b-385,7];break;case 768>=b:g=[18,b-513,8];break;case 1024>=b:g=[19,b-769,8];break;case 1536>=b:g=[20,b-1025,9];break;case 2048>=b:g=[21,b-1537,9];break;case 3072>=b:g=[22,b-2049,10];break;case 4096>=b:g=[23,b-3073,10];break;case 6144>=b:g=[24,b-4097,11];break;case 8192>=b:g=[25,b-6145,11];break;case 12288>=b:g=[26,b-8193,12];break;case 16384>=
+b:g=[27,b-12289,12];break;case 24576>=b:g=[28,b-16385,13];break;case 32768>=b:g=[29,b-24577,13];break;default:m("invalid distance")}f=g;d[e++]=f[0];d[e++]=f[1];d[e++]=f[2];var h,i;h=0;for(i=d.length;h<i;++h)k[p++]=d[h];v[d[0]]++;x[d[3]]++;t=a.length+c-1;l=null}var e,f,d,g,h,j={},i,q,l,k=B?new Uint16Array(2*a.length):[],p=0,t=0,v=new (B?Uint32Array:Array)(286),x=new (B?Uint32Array:Array)(30),F=c.F,w;if(!B){for(d=0;285>=d;)v[d++]=0;for(d=0;29>=d;)x[d++]=0}v[256]=1;e=0;for(f=a.length;e<f;++e){d=h=0;
+for(g=3;d<g&&e+d!==f;++d)h=h<<8|a[e+d];j[h]===r&&(j[h]=[]);i=j[h];if(!(0<t--)){for(;0<i.length&&32768<e-i[0];)i.shift();if(e+3>=f){l&&b(l,-1);d=0;for(g=f-e;d<g;++d)w=a[e+d],k[p++]=w,++v[w];break}if(0<i.length){var A=r,C=r,n=0,s=r,E=r,D=r,ca=r,V=a.length,E=0,ca=i.length;a:for(;E<ca;E++){A=i[ca-E-1];s=3;if(3<n){for(D=n;3<D;D--)if(a[A+D-1]!==a[e+D-1])continue a;s=n}for(;258>s&&e+s<V&&a[A+s]===a[e+s];)++s;s>n&&(C=A,n=s);if(258===s)break}q=new xa(n,e-C);l?l.length<q.length?(w=a[e-1],k[p++]=w,++v[w],b(q,
+0)):b(l,-1):q.length<F?l=q:b(q,0)}else l?b(l,-1):(w=a[e],k[p++]=w,++v[w])}i.push(e)}k[p++]=256;v[256]++;c.T=v;c.S=x;return B?k.subarray(0,p):k}
+function ua(c,a){function b(a){var c=x[a][F[a]];c===l?(b(a+1),b(a+1)):--t[c];++F[a]}var e=c.length,f=new oa(572),d=new (B?Uint8Array:Array)(e),g,h,j,i,q;if(!B)for(i=0;i<e;i++)d[i]=0;for(i=0;i<e;++i)0<c[i]&&f.push(i,c[i]);g=Array(f.length/2);h=new (B?Uint32Array:Array)(f.length/2);if(1===g.length)return d[f.pop().index]=1,d;i=0;for(q=f.length/2;i<q;++i)g[i]=f.pop(),h[i]=g[i].value;var l=h.length,k=new (B?Uint16Array:Array)(a),p=new (B?Uint8Array:Array)(a),t=new (B?Uint8Array:Array)(l),v=Array(a),x=
+Array(a),F=Array(a),w=(1<<a)-l,A=1<<a-1,C,n,s,E,D;k[a-1]=l;for(n=0;n<a;++n)w<A?p[n]=0:(p[n]=1,w-=A),w<<=1,k[a-2-n]=(k[a-1-n]/2|0)+l;k[0]=p[0];v[0]=Array(k[0]);x[0]=Array(k[0]);for(n=1;n<a;++n)k[n]>2*k[n-1]+p[n]&&(k[n]=2*k[n-1]+p[n]),v[n]=Array(k[n]),x[n]=Array(k[n]);for(C=0;C<l;++C)t[C]=a;for(s=0;s<k[a-1];++s)v[a-1][s]=h[s],x[a-1][s]=s;for(C=0;C<a;++C)F[C]=0;1===p[a-1]&&(--t[0],++F[a-1]);for(n=a-2;0<=n;--n){E=C=0;D=F[n+1];for(s=0;s<k[n];s++)E=v[n+1][D]+v[n+1][D+1],E>h[C]?(v[n][s]=E,x[n][s]=l,D+=2):
+(v[n][s]=h[C],x[n][s]=C,++C);F[n]=0;1===p[n]&&b(n)}j=t;i=0;for(q=g.length;i<q;++i)d[g[i].index]=j[i];return d}function wa(c){var a=new (B?Uint16Array:Array)(c.length),b=[],e=[],f=0,d,g,h,j;d=0;for(g=c.length;d<g;d++)b[c[d]]=(b[c[d]]|0)+1;d=1;for(g=16;d<=g;d++)e[d]=f,f+=b[d]|0,f<<=1;d=0;for(g=c.length;d<g;d++){f=e[c[d]];e[c[d]]+=1;h=a[d]=0;for(j=c[d];h<j;h++)a[d]=a[d]<<1|f&1,f>>>=1}return a};function Ea(c,a){this.input=c;this.a=new (B?Uint8Array:Array)(32768);this.l=Fa.u;var b={},e;if((a||!(a={}))&&"number"===typeof a.compressionType)this.l=a.compressionType;for(e in a)b[e]=a[e];b.outputBuffer=this.a;this.H=new pa(this.input,b)}var Fa=ra;
+Ea.prototype.h=function(){var c,a,b,e,f,d,g,h=0;g=this.a;c=Ga;switch(c){case Ga:a=Math.LOG2E*Math.log(32768)-8;break;default:m(Error("invalid compression method"))}b=a<<4|c;g[h++]=b;switch(c){case Ga:switch(this.l){case Fa.NONE:f=0;break;case Fa.K:f=1;break;case Fa.u:f=2;break;default:m(Error("unsupported compression type"))}break;default:m(Error("invalid compression method"))}e=f<<6|0;g[h++]=e|31-(256*b+e)%31;d=aa(this.input);this.H.b=h;g=this.H.h();h=g.length;B&&(g=new Uint8Array(g.buffer),g.length<=
+h+4&&(this.a=new Uint8Array(g.length+4),this.a.set(g),g=this.a),g=g.subarray(0,h+4));g[h++]=d>>24&255;g[h++]=d>>16&255;g[h++]=d>>8&255;g[h++]=d&255;return g};function Ha(c,a){this.input=c;this.b=this.c=0;this.g={};a&&(a.flags&&(this.g=a.flags),"string"===typeof a.filename&&(this.filename=a.filename),"string"===typeof a.comment&&(this.comment=a.comment),a.deflateOptions&&(this.m=a.deflateOptions));this.m||(this.m={})}
+Ha.prototype.h=function(){var c,a,b,e,f,d,g,h,j=new (B?Uint8Array:Array)(32768),i=0,q=this.input,l=this.c,k=this.filename,p=this.comment;j[i++]=31;j[i++]=139;j[i++]=8;c=0;this.g.fname&&(c|=Ia);this.g.fcomment&&(c|=Ja);this.g.fhcrc&&(c|=Ka);j[i++]=c;a=(Date.now?Date.now():+new Date)/1E3|0;j[i++]=a&255;j[i++]=a>>>8&255;j[i++]=a>>>16&255;j[i++]=a>>>24&255;j[i++]=0;j[i++]=Ya;if(this.g.fname!==r){g=0;for(h=k.length;g<h;++g)d=k.charCodeAt(g),255<d&&(j[i++]=d>>>8&255),j[i++]=d&255;j[i++]=0}if(this.g.comment){g=
+0;for(h=p.length;g<h;++g)d=p.charCodeAt(g),255<d&&(j[i++]=d>>>8&255),j[i++]=d&255;j[i++]=0}this.g.fhcrc&&(b=S.k(j,0,i)&65535,j[i++]=b&255,j[i++]=b>>>8&255);this.m.outputBuffer=j;this.m.outputIndex=i;f=new pa(q,this.m);j=f.h();i=f.b;B&&(i+8>j.buffer.byteLength?(this.a=new Uint8Array(i+8),this.a.set(new Uint8Array(j.buffer)),j=this.a):j=new Uint8Array(j.buffer));e=S.k(q);j[i++]=e&255;j[i++]=e>>>8&255;j[i++]=e>>>16&255;j[i++]=e>>>24&255;h=q.length;j[i++]=h&255;j[i++]=h>>>8&255;j[i++]=h>>>16&255;j[i++]=
+h>>>24&255;this.c=l;B&&i<j.length&&(this.a=j=j.subarray(0,i));return j};var Ya=255,Ka=2,Ia=8,Ja=16;function W(c,a){this.p=[];this.q=32768;this.e=this.j=this.c=this.t=0;this.input=B?new Uint8Array(c):c;this.v=!1;this.r=Za;this.J=!1;if(a||!(a={}))a.index&&(this.c=a.index),a.bufferSize&&(this.q=a.bufferSize),a.bufferType&&(this.r=a.bufferType),a.resize&&(this.J=a.resize);switch(this.r){case $a:this.b=32768;this.a=new (B?Uint8Array:Array)(32768+this.q+258);break;case Za:this.b=0;this.a=new (B?Uint8Array:Array)(this.q);this.f=this.R;this.z=this.O;this.s=this.Q;break;default:m(Error("invalid inflate mode"))}}
+var $a=0,Za=1;
+W.prototype.i=function(){for(;!this.v;){var c=X(this,3);c&1&&(this.v=u);c>>>=1;switch(c){case 0:var a=this.input,b=this.c,e=this.a,f=this.b,d=r,g=r,h=r,j=e.length,i=r;this.e=this.j=0;d=a[b++];d===r&&m(Error("invalid uncompressed block header: LEN (first byte)"));g=d;d=a[b++];d===r&&m(Error("invalid uncompressed block header: LEN (second byte)"));g|=d<<8;d=a[b++];d===r&&m(Error("invalid uncompressed block header: NLEN (first byte)"));h=d;d=a[b++];d===r&&m(Error("invalid uncompressed block header: NLEN (second byte)"));h|=
+d<<8;g===~h&&m(Error("invalid uncompressed block header: length verify"));b+g>a.length&&m(Error("input buffer is broken"));switch(this.r){case $a:for(;f+g>e.length;){i=j-f;g-=i;if(B)e.set(a.subarray(b,b+i),f),f+=i,b+=i;else for(;i--;)e[f++]=a[b++];this.b=f;e=this.f();f=this.b}break;case Za:for(;f+g>e.length;)e=this.f({B:2});break;default:m(Error("invalid inflate mode"))}if(B)e.set(a.subarray(b,b+g),f),f+=g,b+=g;else for(;g--;)e[f++]=a[b++];this.c=b;this.b=f;this.a=e;break;case 1:this.s(ab,bb);break;
+case 2:cb(this);break;default:m(Error("unknown BTYPE: "+c))}}return this.z()};
+var db=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15],eb=B?new Uint16Array(db):db,fb=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258,258,258],gb=B?new Uint16Array(fb):fb,hb=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0,0,0],ib=B?new Uint8Array(hb):hb,jb=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577],kb=B?new Uint16Array(jb):jb,lb=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,
+10,11,11,12,12,13,13],mb=B?new Uint8Array(lb):lb,nb=new (B?Uint8Array:Array)(288),Y,ob;Y=0;for(ob=nb.length;Y<ob;++Y)nb[Y]=143>=Y?8:255>=Y?9:279>=Y?7:8;var ab=T(nb),pb=new (B?Uint8Array:Array)(30),qb,rb;qb=0;for(rb=pb.length;qb<rb;++qb)pb[qb]=5;var bb=T(pb);function X(c,a){for(var b=c.j,e=c.e,f=c.input,d=c.c,g;e<a;)g=f[d++],g===r&&m(Error("input buffer is broken")),b|=g<<e,e+=8;g=b&(1<<a)-1;c.j=b>>>a;c.e=e-a;c.c=d;return g}
+function sb(c,a){for(var b=c.j,e=c.e,f=c.input,d=c.c,g=a[0],h=a[1],j,i,q;e<h;)j=f[d++],j===r&&m(Error("input buffer is broken")),b|=j<<e,e+=8;i=g[b&(1<<h)-1];q=i>>>16;c.j=b>>q;c.e=e-q;c.c=d;return i&65535}
+function cb(c){function a(a,b,c){var d,f,e,g;for(g=0;g<a;)switch(d=sb(this,b),d){case 16:for(e=3+X(this,2);e--;)c[g++]=f;break;case 17:for(e=3+X(this,3);e--;)c[g++]=0;f=0;break;case 18:for(e=11+X(this,7);e--;)c[g++]=0;f=0;break;default:f=c[g++]=d}return c}var b=X(c,5)+257,e=X(c,5)+1,f=X(c,4)+4,d=new (B?Uint8Array:Array)(eb.length),g,h,j,i;for(i=0;i<f;++i)d[eb[i]]=X(c,3);g=T(d);h=new (B?Uint8Array:Array)(b);j=new (B?Uint8Array:Array)(e);c.s(T(a.call(c,b,g,h)),T(a.call(c,e,g,j)))}
+W.prototype.s=function(c,a){var b=this.a,e=this.b;this.A=c;for(var f=b.length-258,d,g,h,j;256!==(d=sb(this,c));)if(256>d)e>=f&&(this.b=e,b=this.f(),e=this.b),b[e++]=d;else{g=d-257;j=gb[g];0<ib[g]&&(j+=X(this,ib[g]));d=sb(this,a);h=kb[d];0<mb[d]&&(h+=X(this,mb[d]));e>=f&&(this.b=e,b=this.f(),e=this.b);for(;j--;)b[e]=b[e++-h]}for(;8<=this.e;)this.e-=8,this.c--;this.b=e};
+W.prototype.Q=function(c,a){var b=this.a,e=this.b;this.A=c;for(var f=b.length,d,g,h,j;256!==(d=sb(this,c));)if(256>d)e>=f&&(b=this.f(),f=b.length),b[e++]=d;else{g=d-257;j=gb[g];0<ib[g]&&(j+=X(this,ib[g]));d=sb(this,a);h=kb[d];0<mb[d]&&(h+=X(this,mb[d]));e+j>f&&(b=this.f(),f=b.length);for(;j--;)b[e]=b[e++-h]}for(;8<=this.e;)this.e-=8,this.c--;this.b=e};
+W.prototype.f=function(){var c=new (B?Uint8Array:Array)(this.b-32768),a=this.b-32768,b,e,f=this.a;if(B)c.set(f.subarray(32768,c.length));else{b=0;for(e=c.length;b<e;++b)c[b]=f[b+32768]}this.p.push(c);this.t+=c.length;if(B)f.set(f.subarray(a,a+32768));else for(b=0;32768>b;++b)f[b]=f[a+b];this.b=32768;return f};
+W.prototype.R=function(c){var a,b=this.input.length/this.c+1|0,e,f,d,g=this.input,h=this.a;c&&("number"===typeof c.B&&(b=c.B),"number"===typeof c.M&&(b+=c.M));2>b?(e=(g.length-this.c)/this.A[2],d=258*(e/2)|0,f=d<h.length?h.length+d:h.length<<1):f=h.length*b;B?(a=new Uint8Array(f),a.set(h)):a=h;return this.a=a};
+W.prototype.z=function(){var c=0,a=this.a,b=this.p,e,f=new (B?Uint8Array:Array)(this.t+(this.b-32768)),d,g,h,j;if(0===b.length)return B?this.a.subarray(32768,this.b):this.a.slice(32768,this.b);d=0;for(g=b.length;d<g;++d){e=b[d];h=0;for(j=e.length;h<j;++h)f[c++]=e[h]}d=32768;for(g=this.b;d<g;++d)f[c++]=a[d];this.p=[];return this.buffer=f};
+W.prototype.O=function(){var c,a=this.b;B?this.J?(c=new Uint8Array(a),c.set(this.a.subarray(0,a))):c=this.a.subarray(0,a):(this.a.length>a&&(this.a.length=a),c=this.a);return this.buffer=c};function tb(c){this.input=c;this.c=0;this.member=[]}
+tb.prototype.i=function(){for(var c=this.input.length;this.c<c;){var a=new na,b=r,e=r,f=r,d=r,g=r,h=r,j=r,i=r,q=r,l=this.input,k=this.c;a.C=l[k++];a.D=l[k++];(31!==a.C||139!==a.D)&&m(Error("invalid file signature:",a.C,a.D));a.w=l[k++];switch(a.w){case 8:break;default:m(Error("unknown compression method: "+a.w))}a.o=l[k++];i=l[k++]|l[k++]<<8|l[k++]<<16|l[k++]<<24;a.Z=new Date(1E3*i);a.aa=l[k++];a.$=l[k++];0<(a.o&4)&&(a.V=l[k++]|l[k++]<<8,k+=a.V);if(0<(a.o&Ia)){j=[];for(h=0;0<(g=l[k++]);)j[h++]=String.fromCharCode(g);
+a.name=j.join("")}if(0<(a.o&Ja)){j=[];for(h=0;0<(g=l[k++]);)j[h++]=String.fromCharCode(g);a.comment=j.join("")}0<(a.o&Ka)&&(a.P=S.k(l,0,k)&65535,a.P!==(l[k++]|l[k++]<<8)&&m(Error("invalid header crc16")));b=l[l.length-4]|l[l.length-3]<<8|l[l.length-2]<<16|l[l.length-1]<<24;l.length-k-4-4<512*b&&(d=b);e=new W(l,{index:k,bufferSize:d});a.data=f=e.i();k=e.c;a.X=q=(l[k++]|l[k++]<<8|l[k++]<<16|l[k++]<<24)>>>0;S.k(f)!==q&&m(Error("invalid CRC-32 checksum: 0x"+S.k(f).toString(16)+" / 0x"+q.toString(16)));
+a.Y=b=(l[k++]|l[k++]<<8|l[k++]<<16|l[k++]<<24)>>>0;(f.length&4294967295)!==b&&m(Error("invalid input size: "+(f.length&4294967295)+" / "+b));this.member.push(a);this.c=k}var p=this.member,t,v,x=0,F=0,w;t=0;for(v=p.length;t<v;++t)F+=p[t].data.length;if(B){w=new Uint8Array(F);for(t=0;t<v;++t)w.set(p[t].data,x),x+=p[t].data.length}else{w=[];for(t=0;t<v;++t)w[t]=p[t].data;w=Array.prototype.concat.apply([],w)}return w};function ub(c,a){var b,e;this.input=c;this.c=0;if(a||!(a={}))a.index&&(this.c=a.index),a.verify&&(this.U=a.verify);b=c[this.c++];e=c[this.c++];switch(b&15){case Ga:this.method=Ga;break;default:m(Error("unsupported compression method"))}0!==((b<<8)+e)%31&&m(Error("invalid fcheck flag:"+((b<<8)+e)%31));e&32&&m(Error("fdict flag is not supported"));this.I=new W(c,{index:this.c,bufferSize:a.bufferSize,bufferType:a.bufferType,resize:a.resize})}
+ub.prototype.i=function(){var c=this.input,a,b;a=this.I.i();this.c=this.I.c;this.U&&(b=(c[this.c++]<<24|c[this.c++]<<16|c[this.c++]<<8|c[this.c++])>>>0,b!==aa(a)&&m(Error("invalid adler-32 checksum")));return a};exports.deflate=vb;exports.deflateSync=wb;exports.inflate=xb;exports.inflateSync=yb;exports.gzip=zb;exports.gzipSync=Ab;exports.gunzip=Bb;exports.gunzipSync=Cb;function vb(c,a,b){process.nextTick(function(){var e,f;try{f=wb(c,b)}catch(d){e=d}a(e,f)})}function wb(c,a){var b;b=(new Ea(c)).h();a||(a={});return a.G?b:Db(b)}function xb(c,a,b){process.nextTick(function(){var e,f;try{f=yb(c,b)}catch(d){e=d}a(e,f)})}
+function yb(c,a){var b;c.subarray=c.slice;b=(new ub(c)).i();a||(a={});return a.noBuffer?b:Db(b)}function zb(c,a,b){process.nextTick(function(){var e,f;try{f=Ab(c,b)}catch(d){e=d}a(e,f)})}function Ab(c,a){var b;c.subarray=c.slice;b=(new Ha(c)).h();a||(a={});return a.G?b:Db(b)}function Bb(c,a,b){process.nextTick(function(){var e,f;try{f=Cb(c,b)}catch(d){e=d}a(e,f)})}function Cb(c,a){var b;c.subarray=c.slice;b=(new tb(c)).i();a||(a={});return a.G?b:Db(b)}
+function Db(c){var a=new Buffer(c.length),b,e;b=0;for(e=c.length;b<e;++b)a[b]=c[b];return a};var Eb=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];B&&new Uint16Array(Eb);var Fb=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258,258,258];B&&new Uint16Array(Fb);var Gb=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0,0,0];B&&new Uint8Array(Gb);var Hb=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];B&&new Uint16Array(Hb);
+var Ib=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];B&&new Uint8Array(Ib);var Jb=new (B?Uint8Array:Array)(288),$,Kb;$=0;for(Kb=Jb.length;$<Kb;++$)Jb[$]=143>=$?8:255>=$?9:279>=$?7:8;T(Jb);var Lb=new (B?Uint8Array:Array)(30),Mb,Nb;Mb=0;for(Nb=Lb.length;Mb<Nb;++Mb)Lb[Mb]=5;T(Lb);var Ga=8;}).call(this);
+
+})(require("__browserify_process"),require("__browserify_Buffer").Buffer)
+},{"__browserify_process":33,"__browserify_Buffer":44}],151:[function(require,module,exports){
 (function(Buffer){// Copyright (c) 2012 Kuba Niegowski
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -29540,124 +29663,7 @@ var PaethPredictor = function(left, above, upLeft) {
 };
 
 })(require("__browserify_Buffer").Buffer)
-},{"zlib":147,"util":47,"./chunkstream":149,"__browserify_Buffer":40}],153:[function(require,module,exports){
-"use strict"
-
-function unique_pred(list, compare) {
-  var ptr = 1
-    , len = list.length
-    , a=list[0], b=list[0]
-  for(var i=1; i<len; ++i) {
-    b = a
-    a = list[i]
-    if(compare(a, b)) {
-      if(i === ptr) {
-        ptr++
-        continue
-      }
-      list[ptr++] = a
-    }
-  }
-  list.length = ptr
-  return list
-}
-
-function unique_eq(list) {
-  var ptr = 1
-    , len = list.length
-    , a=list[0], b = list[0]
-  for(var i=1; i<len; ++i, b=a) {
-    b = a
-    a = list[i]
-    if(a !== b) {
-      if(i === ptr) {
-        ptr++
-        continue
-      }
-      list[ptr++] = a
-    }
-  }
-  list.length = ptr
-  return list
-}
-
-function unique(list, compare, sorted) {
-  if(list.length === 0) {
-    return list
-  }
-  if(compare) {
-    if(!sorted) {
-      list.sort(compare)
-    }
-    return unique_pred(list, compare)
-  }
-  if(!sorted) {
-    list.sort()
-  }
-  return unique_eq(list)
-}
-
-module.exports = unique
-
-},{}],154:[function(require,module,exports){
-(function(process,Buffer){/** @license zlib.js 2012 - imaya [ https://github.com/imaya/zlib.js ] The MIT License */
-(function() {'use strict';function m(c){throw c;}var r=void 0,u=!0;var B="undefined"!==typeof Uint8Array&&"undefined"!==typeof Uint16Array&&"undefined"!==typeof Uint32Array;function aa(c){if("string"===typeof c){var a=c.split(""),b,e;b=0;for(e=a.length;b<e;b++)a[b]=(a[b].charCodeAt(0)&255)>>>0;c=a}for(var f=1,d=0,g=c.length,h,j=0;0<g;){h=1024<g?1024:g;g-=h;do f+=c[j++],d+=f;while(--h);f%=65521;d%=65521}return(d<<16|f)>>>0};function I(c,a){this.index="number"===typeof a?a:0;this.n=0;this.buffer=c instanceof(B?Uint8Array:Array)?c:new (B?Uint8Array:Array)(32768);2*this.buffer.length<=this.index&&m(Error("invalid index"));this.buffer.length<=this.index&&this.f()}I.prototype.f=function(){var c=this.buffer,a,b=c.length,e=new (B?Uint8Array:Array)(b<<1);if(B)e.set(c);else for(a=0;a<b;++a)e[a]=c[a];return this.buffer=e};
-I.prototype.d=function(c,a,b){var e=this.buffer,f=this.index,d=this.n,g=e[f],h;b&&1<a&&(c=8<a?(K[c&255]<<24|K[c>>>8&255]<<16|K[c>>>16&255]<<8|K[c>>>24&255])>>32-a:K[c]>>8-a);if(8>a+d)g=g<<a|c,d+=a;else for(h=0;h<a;++h)g=g<<1|c>>a-h-1&1,8===++d&&(d=0,e[f++]=K[g],g=0,f===e.length&&(e=this.f()));e[f]=g;this.buffer=e;this.n=d;this.index=f};I.prototype.finish=function(){var c=this.buffer,a=this.index,b;0<this.n&&(c[a]<<=8-this.n,c[a]=K[c[a]],a++);B?b=c.subarray(0,a):(c.length=a,b=c);return b};
-var ba=new (B?Uint8Array:Array)(256),Q;for(Q=0;256>Q;++Q){for(var R=Q,ga=R,ha=7,R=R>>>1;R;R>>>=1)ga<<=1,ga|=R&1,--ha;ba[Q]=(ga<<ha&255)>>>0}var K=ba;var S={k:function(c,a,b){return S.update(c,0,a,b)},update:function(c,a,b,e){for(var f=S.L,d="number"===typeof b?b:b=0,g="number"===typeof e?e:c.length,a=a^4294967295,d=g&7;d--;++b)a=a>>>8^f[(a^c[b])&255];for(d=g>>3;d--;b+=8)a=a>>>8^f[(a^c[b])&255],a=a>>>8^f[(a^c[b+1])&255],a=a>>>8^f[(a^c[b+2])&255],a=a>>>8^f[(a^c[b+3])&255],a=a>>>8^f[(a^c[b+4])&255],a=a>>>8^f[(a^c[b+5])&255],a=a>>>8^f[(a^c[b+6])&255],a=a>>>8^f[(a^c[b+7])&255];return(a^4294967295)>>>0}},ia=S,ja,ka=[0,1996959894,3993919788,2567524794,
-124634137,1886057615,3915621685,2657392035,249268274,2044508324,3772115230,2547177864,162941995,2125561021,3887607047,2428444049,498536548,1789927666,4089016648,2227061214,450548861,1843258603,4107580753,2211677639,325883990,1684777152,4251122042,2321926636,335633487,1661365465,4195302755,2366115317,997073096,1281953886,3579855332,2724688242,1006888145,1258607687,3524101629,2768942443,901097722,1119000684,3686517206,2898065728,853044451,1172266101,3705015759,2882616665,651767980,1373503546,3369554304,
-3218104598,565507253,1454621731,3485111705,3099436303,671266974,1594198024,3322730930,2970347812,795835527,1483230225,3244367275,3060149565,1994146192,31158534,2563907772,4023717930,1907459465,112637215,2680153253,3904427059,2013776290,251722036,2517215374,3775830040,2137656763,141376813,2439277719,3865271297,1802195444,476864866,2238001368,4066508878,1812370925,453092731,2181625025,4111451223,1706088902,314042704,2344532202,4240017532,1658658271,366619977,2362670323,4224994405,1303535960,984961486,
-2747007092,3569037538,1256170817,1037604311,2765210733,3554079995,1131014506,879679996,2909243462,3663771856,1141124467,855842277,2852801631,3708648649,1342533948,654459306,3188396048,3373015174,1466479909,544179635,3110523913,3462522015,1591671054,702138776,2966460450,3352799412,1504918807,783551873,3082640443,3233442989,3988292384,2596254646,62317068,1957810842,3939845945,2647816111,81470997,1943803523,3814918930,2489596804,225274430,2053790376,3826175755,2466906013,167816743,2097651377,4027552580,
-2265490386,503444072,1762050814,4150417245,2154129355,426522225,1852507879,4275313526,2312317920,282753626,1742555852,4189708143,2394877945,397917763,1622183637,3604390888,2714866558,953729732,1340076626,3518719985,2797360999,1068828381,1219638859,3624741850,2936675148,906185462,1090812512,3747672003,2825379669,829329135,1181335161,3412177804,3160834842,628085408,1382605366,3423369109,3138078467,570562233,1426400815,3317316542,2998733608,733239954,1555261956,3268935591,3050360625,752459403,1541320221,
-2607071920,3965973030,1969922972,40735498,2617837225,3943577151,1913087877,83908371,2512341634,3803740692,2075208622,213261112,2463272603,3855990285,2094854071,198958881,2262029012,4057260610,1759359992,534414190,2176718541,4139329115,1873836001,414664567,2282248934,4279200368,1711684554,285281116,2405801727,4167216745,1634467795,376229701,2685067896,3608007406,1308918612,956543938,2808555105,3495958263,1231636301,1047427035,2932959818,3654703836,1088359270,936918E3,2847714899,3736837829,1202900863,
-817233897,3183342108,3401237130,1404277552,615818150,3134207493,3453421203,1423857449,601450431,3009837614,3294710456,1567103746,711928724,3020668471,3272380065,1510334235,755167117];ja=B?new Uint32Array(ka):ka;ia.L=ja;function na(){};function oa(c){this.buffer=new (B?Uint16Array:Array)(2*c);this.length=0}oa.prototype.getParent=function(c){return 2*((c-2)/4|0)};oa.prototype.push=function(c,a){var b,e,f=this.buffer,d;b=this.length;f[this.length++]=a;for(f[this.length++]=c;0<b;)if(e=this.getParent(b),f[b]>f[e])d=f[b],f[b]=f[e],f[e]=d,d=f[b+1],f[b+1]=f[e+1],f[e+1]=d,b=e;else break;return this.length};
-oa.prototype.pop=function(){var c,a,b=this.buffer,e,f,d;a=b[0];c=b[1];this.length-=2;b[0]=b[this.length];b[1]=b[this.length+1];for(d=0;;){f=2*d+2;if(f>=this.length)break;f+2<this.length&&b[f+2]>b[f]&&(f+=2);if(b[f]>b[d])e=b[d],b[d]=b[f],b[f]=e,e=b[d+1],b[d+1]=b[f+1],b[f+1]=e;else break;d=f}return{index:c,value:a,length:this.length}};function T(c){var a=c.length,b=0,e=Number.POSITIVE_INFINITY,f,d,g,h,j,i,q,l,k;for(l=0;l<a;++l)c[l]>b&&(b=c[l]),c[l]<e&&(e=c[l]);f=1<<b;d=new (B?Uint32Array:Array)(f);g=1;h=0;for(j=2;g<=b;){for(l=0;l<a;++l)if(c[l]===g){i=0;q=h;for(k=0;k<g;++k)i=i<<1|q&1,q>>=1;for(k=i;k<f;k+=j)d[k]=g<<16|l;++h}++g;h<<=1;j<<=1}return[d,b,e]};function pa(c,a){this.l=qa;this.F=0;this.input=c;this.b=0;a&&(a.lazy&&(this.F=a.lazy),"number"===typeof a.compressionType&&(this.l=a.compressionType),a.outputBuffer&&(this.a=B&&a.outputBuffer instanceof Array?new Uint8Array(a.outputBuffer):a.outputBuffer),"number"===typeof a.outputIndex&&(this.b=a.outputIndex));this.a||(this.a=new (B?Uint8Array:Array)(32768))}var qa=2,ra={NONE:0,K:1,u:qa,W:3},sa=[],U;
-for(U=0;288>U;U++)switch(u){case 143>=U:sa.push([U+48,8]);break;case 255>=U:sa.push([U-144+400,9]);break;case 279>=U:sa.push([U-256+0,7]);break;case 287>=U:sa.push([U-280+192,8]);break;default:m("invalid literal: "+U)}
-pa.prototype.h=function(){var c,a,b,e,f=this.input;switch(this.l){case 0:b=0;for(e=f.length;b<e;){a=B?f.subarray(b,b+65535):f.slice(b,b+65535);b+=a.length;var d=a,g=b===e,h=r,j=r,i=r,q=r,l=r,k=this.a,p=this.b;if(B){for(k=new Uint8Array(this.a.buffer);k.length<=p+d.length+5;)k=new Uint8Array(k.length<<1);k.set(this.a)}h=g?1:0;k[p++]=h|0;j=d.length;i=~j+65536&65535;k[p++]=j&255;k[p++]=j>>>8&255;k[p++]=i&255;k[p++]=i>>>8&255;if(B)k.set(d,p),p+=d.length,k=k.subarray(0,p);else{q=0;for(l=d.length;q<l;++q)k[p++]=
-d[q];k.length=p}this.b=p;this.a=k}break;case 1:var t=new I(new Uint8Array(this.a.buffer),this.b);t.d(1,1,u);t.d(1,2,u);var v=ta(this,f),x,F,w;x=0;for(F=v.length;x<F;x++)if(w=v[x],I.prototype.d.apply(t,sa[w]),256<w)t.d(v[++x],v[++x],u),t.d(v[++x],5),t.d(v[++x],v[++x],u);else if(256===w)break;this.a=t.finish();this.b=this.a.length;break;case qa:var A=new I(new Uint8Array(this.a),this.b),C,n,s,E,D,ca=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15],V,La,da,Ma,la,va=Array(19),Na,Z,ma,G,Oa;C=qa;A.d(1,
-1,u);A.d(C,2,u);n=ta(this,f);V=ua(this.T,15);La=wa(V);da=ua(this.S,7);Ma=wa(da);for(s=286;257<s&&0===V[s-1];s--);for(E=30;1<E&&0===da[E-1];E--);var Pa=s,Qa=E,M=new (B?Uint32Array:Array)(Pa+Qa),y,N,z,ea,L=new (B?Uint32Array:Array)(316),J,H,O=new (B?Uint8Array:Array)(19);for(y=N=0;y<Pa;y++)M[N++]=V[y];for(y=0;y<Qa;y++)M[N++]=da[y];if(!B){y=0;for(ea=O.length;y<ea;++y)O[y]=0}y=J=0;for(ea=M.length;y<ea;y+=N){for(N=1;y+N<ea&&M[y+N]===M[y];++N);z=N;if(0===M[y])if(3>z)for(;0<z--;)L[J++]=0,O[0]++;else for(;0<
-z;)H=138>z?z:138,H>z-3&&H<z&&(H=z-3),10>=H?(L[J++]=17,L[J++]=H-3,O[17]++):(L[J++]=18,L[J++]=H-11,O[18]++),z-=H;else if(L[J++]=M[y],O[M[y]]++,z--,3>z)for(;0<z--;)L[J++]=M[y],O[M[y]]++;else for(;0<z;)H=6>z?z:6,H>z-3&&H<z&&(H=z-3),L[J++]=16,L[J++]=H-3,O[16]++,z-=H}c=B?L.subarray(0,J):L.slice(0,J);la=ua(O,7);for(G=0;19>G;G++)va[G]=la[ca[G]];for(D=19;4<D&&0===va[D-1];D--);Na=wa(la);A.d(s-257,5,u);A.d(E-1,5,u);A.d(D-4,4,u);for(G=0;G<D;G++)A.d(va[G],3,u);G=0;for(Oa=c.length;G<Oa;G++)if(Z=c[G],A.d(Na[Z],
-la[Z],u),16<=Z){G++;switch(Z){case 16:ma=2;break;case 17:ma=3;break;case 18:ma=7;break;default:m("invalid code: "+Z)}A.d(c[G],ma,u)}var Ra=[La,V],Sa=[Ma,da],P,Ta,fa,ya,Ua,Va,Wa,Xa;Ua=Ra[0];Va=Ra[1];Wa=Sa[0];Xa=Sa[1];P=0;for(Ta=n.length;P<Ta;++P)if(fa=n[P],A.d(Ua[fa],Va[fa],u),256<fa)A.d(n[++P],n[++P],u),ya=n[++P],A.d(Wa[ya],Xa[ya],u),A.d(n[++P],n[++P],u);else if(256===fa)break;this.a=A.finish();this.b=this.a.length;break;default:m("invalid compression type")}return this.a};
-function xa(c,a){this.length=c;this.N=a}
-function za(){var c=Aa;switch(u){case 3===c:return[257,c-3,0];case 4===c:return[258,c-4,0];case 5===c:return[259,c-5,0];case 6===c:return[260,c-6,0];case 7===c:return[261,c-7,0];case 8===c:return[262,c-8,0];case 9===c:return[263,c-9,0];case 10===c:return[264,c-10,0];case 12>=c:return[265,c-11,1];case 14>=c:return[266,c-13,1];case 16>=c:return[267,c-15,1];case 18>=c:return[268,c-17,1];case 22>=c:return[269,c-19,2];case 26>=c:return[270,c-23,2];case 30>=c:return[271,c-27,2];case 34>=c:return[272,c-
-31,2];case 42>=c:return[273,c-35,3];case 50>=c:return[274,c-43,3];case 58>=c:return[275,c-51,3];case 66>=c:return[276,c-59,3];case 82>=c:return[277,c-67,4];case 98>=c:return[278,c-83,4];case 114>=c:return[279,c-99,4];case 130>=c:return[280,c-115,4];case 162>=c:return[281,c-131,5];case 194>=c:return[282,c-163,5];case 226>=c:return[283,c-195,5];case 257>=c:return[284,c-227,5];case 258===c:return[285,c-258,0];default:m("invalid length: "+c)}}var Ba=[],Aa,Ca;
-for(Aa=3;258>=Aa;Aa++)Ca=za(),Ba[Aa]=Ca[2]<<24|Ca[1]<<16|Ca[0];var Da=B?new Uint32Array(Ba):Ba;
-function ta(c,a){function b(a,c){var b=a.N,d=[],e=0,f;f=Da[a.length];d[e++]=f&65535;d[e++]=f>>16&255;d[e++]=f>>24;var g;switch(u){case 1===b:g=[0,b-1,0];break;case 2===b:g=[1,b-2,0];break;case 3===b:g=[2,b-3,0];break;case 4===b:g=[3,b-4,0];break;case 6>=b:g=[4,b-5,1];break;case 8>=b:g=[5,b-7,1];break;case 12>=b:g=[6,b-9,2];break;case 16>=b:g=[7,b-13,2];break;case 24>=b:g=[8,b-17,3];break;case 32>=b:g=[9,b-25,3];break;case 48>=b:g=[10,b-33,4];break;case 64>=b:g=[11,b-49,4];break;case 96>=b:g=[12,b-
-65,5];break;case 128>=b:g=[13,b-97,5];break;case 192>=b:g=[14,b-129,6];break;case 256>=b:g=[15,b-193,6];break;case 384>=b:g=[16,b-257,7];break;case 512>=b:g=[17,b-385,7];break;case 768>=b:g=[18,b-513,8];break;case 1024>=b:g=[19,b-769,8];break;case 1536>=b:g=[20,b-1025,9];break;case 2048>=b:g=[21,b-1537,9];break;case 3072>=b:g=[22,b-2049,10];break;case 4096>=b:g=[23,b-3073,10];break;case 6144>=b:g=[24,b-4097,11];break;case 8192>=b:g=[25,b-6145,11];break;case 12288>=b:g=[26,b-8193,12];break;case 16384>=
-b:g=[27,b-12289,12];break;case 24576>=b:g=[28,b-16385,13];break;case 32768>=b:g=[29,b-24577,13];break;default:m("invalid distance")}f=g;d[e++]=f[0];d[e++]=f[1];d[e++]=f[2];var h,i;h=0;for(i=d.length;h<i;++h)k[p++]=d[h];v[d[0]]++;x[d[3]]++;t=a.length+c-1;l=null}var e,f,d,g,h,j={},i,q,l,k=B?new Uint16Array(2*a.length):[],p=0,t=0,v=new (B?Uint32Array:Array)(286),x=new (B?Uint32Array:Array)(30),F=c.F,w;if(!B){for(d=0;285>=d;)v[d++]=0;for(d=0;29>=d;)x[d++]=0}v[256]=1;e=0;for(f=a.length;e<f;++e){d=h=0;
-for(g=3;d<g&&e+d!==f;++d)h=h<<8|a[e+d];j[h]===r&&(j[h]=[]);i=j[h];if(!(0<t--)){for(;0<i.length&&32768<e-i[0];)i.shift();if(e+3>=f){l&&b(l,-1);d=0;for(g=f-e;d<g;++d)w=a[e+d],k[p++]=w,++v[w];break}if(0<i.length){var A=r,C=r,n=0,s=r,E=r,D=r,ca=r,V=a.length,E=0,ca=i.length;a:for(;E<ca;E++){A=i[ca-E-1];s=3;if(3<n){for(D=n;3<D;D--)if(a[A+D-1]!==a[e+D-1])continue a;s=n}for(;258>s&&e+s<V&&a[A+s]===a[e+s];)++s;s>n&&(C=A,n=s);if(258===s)break}q=new xa(n,e-C);l?l.length<q.length?(w=a[e-1],k[p++]=w,++v[w],b(q,
-0)):b(l,-1):q.length<F?l=q:b(q,0)}else l?b(l,-1):(w=a[e],k[p++]=w,++v[w])}i.push(e)}k[p++]=256;v[256]++;c.T=v;c.S=x;return B?k.subarray(0,p):k}
-function ua(c,a){function b(a){var c=x[a][F[a]];c===l?(b(a+1),b(a+1)):--t[c];++F[a]}var e=c.length,f=new oa(572),d=new (B?Uint8Array:Array)(e),g,h,j,i,q;if(!B)for(i=0;i<e;i++)d[i]=0;for(i=0;i<e;++i)0<c[i]&&f.push(i,c[i]);g=Array(f.length/2);h=new (B?Uint32Array:Array)(f.length/2);if(1===g.length)return d[f.pop().index]=1,d;i=0;for(q=f.length/2;i<q;++i)g[i]=f.pop(),h[i]=g[i].value;var l=h.length,k=new (B?Uint16Array:Array)(a),p=new (B?Uint8Array:Array)(a),t=new (B?Uint8Array:Array)(l),v=Array(a),x=
-Array(a),F=Array(a),w=(1<<a)-l,A=1<<a-1,C,n,s,E,D;k[a-1]=l;for(n=0;n<a;++n)w<A?p[n]=0:(p[n]=1,w-=A),w<<=1,k[a-2-n]=(k[a-1-n]/2|0)+l;k[0]=p[0];v[0]=Array(k[0]);x[0]=Array(k[0]);for(n=1;n<a;++n)k[n]>2*k[n-1]+p[n]&&(k[n]=2*k[n-1]+p[n]),v[n]=Array(k[n]),x[n]=Array(k[n]);for(C=0;C<l;++C)t[C]=a;for(s=0;s<k[a-1];++s)v[a-1][s]=h[s],x[a-1][s]=s;for(C=0;C<a;++C)F[C]=0;1===p[a-1]&&(--t[0],++F[a-1]);for(n=a-2;0<=n;--n){E=C=0;D=F[n+1];for(s=0;s<k[n];s++)E=v[n+1][D]+v[n+1][D+1],E>h[C]?(v[n][s]=E,x[n][s]=l,D+=2):
-(v[n][s]=h[C],x[n][s]=C,++C);F[n]=0;1===p[n]&&b(n)}j=t;i=0;for(q=g.length;i<q;++i)d[g[i].index]=j[i];return d}function wa(c){var a=new (B?Uint16Array:Array)(c.length),b=[],e=[],f=0,d,g,h,j;d=0;for(g=c.length;d<g;d++)b[c[d]]=(b[c[d]]|0)+1;d=1;for(g=16;d<=g;d++)e[d]=f,f+=b[d]|0,f<<=1;d=0;for(g=c.length;d<g;d++){f=e[c[d]];e[c[d]]+=1;h=a[d]=0;for(j=c[d];h<j;h++)a[d]=a[d]<<1|f&1,f>>>=1}return a};function Ea(c,a){this.input=c;this.a=new (B?Uint8Array:Array)(32768);this.l=Fa.u;var b={},e;if((a||!(a={}))&&"number"===typeof a.compressionType)this.l=a.compressionType;for(e in a)b[e]=a[e];b.outputBuffer=this.a;this.H=new pa(this.input,b)}var Fa=ra;
-Ea.prototype.h=function(){var c,a,b,e,f,d,g,h=0;g=this.a;c=Ga;switch(c){case Ga:a=Math.LOG2E*Math.log(32768)-8;break;default:m(Error("invalid compression method"))}b=a<<4|c;g[h++]=b;switch(c){case Ga:switch(this.l){case Fa.NONE:f=0;break;case Fa.K:f=1;break;case Fa.u:f=2;break;default:m(Error("unsupported compression type"))}break;default:m(Error("invalid compression method"))}e=f<<6|0;g[h++]=e|31-(256*b+e)%31;d=aa(this.input);this.H.b=h;g=this.H.h();h=g.length;B&&(g=new Uint8Array(g.buffer),g.length<=
-h+4&&(this.a=new Uint8Array(g.length+4),this.a.set(g),g=this.a),g=g.subarray(0,h+4));g[h++]=d>>24&255;g[h++]=d>>16&255;g[h++]=d>>8&255;g[h++]=d&255;return g};function Ha(c,a){this.input=c;this.b=this.c=0;this.g={};a&&(a.flags&&(this.g=a.flags),"string"===typeof a.filename&&(this.filename=a.filename),"string"===typeof a.comment&&(this.comment=a.comment),a.deflateOptions&&(this.m=a.deflateOptions));this.m||(this.m={})}
-Ha.prototype.h=function(){var c,a,b,e,f,d,g,h,j=new (B?Uint8Array:Array)(32768),i=0,q=this.input,l=this.c,k=this.filename,p=this.comment;j[i++]=31;j[i++]=139;j[i++]=8;c=0;this.g.fname&&(c|=Ia);this.g.fcomment&&(c|=Ja);this.g.fhcrc&&(c|=Ka);j[i++]=c;a=(Date.now?Date.now():+new Date)/1E3|0;j[i++]=a&255;j[i++]=a>>>8&255;j[i++]=a>>>16&255;j[i++]=a>>>24&255;j[i++]=0;j[i++]=Ya;if(this.g.fname!==r){g=0;for(h=k.length;g<h;++g)d=k.charCodeAt(g),255<d&&(j[i++]=d>>>8&255),j[i++]=d&255;j[i++]=0}if(this.g.comment){g=
-0;for(h=p.length;g<h;++g)d=p.charCodeAt(g),255<d&&(j[i++]=d>>>8&255),j[i++]=d&255;j[i++]=0}this.g.fhcrc&&(b=S.k(j,0,i)&65535,j[i++]=b&255,j[i++]=b>>>8&255);this.m.outputBuffer=j;this.m.outputIndex=i;f=new pa(q,this.m);j=f.h();i=f.b;B&&(i+8>j.buffer.byteLength?(this.a=new Uint8Array(i+8),this.a.set(new Uint8Array(j.buffer)),j=this.a):j=new Uint8Array(j.buffer));e=S.k(q);j[i++]=e&255;j[i++]=e>>>8&255;j[i++]=e>>>16&255;j[i++]=e>>>24&255;h=q.length;j[i++]=h&255;j[i++]=h>>>8&255;j[i++]=h>>>16&255;j[i++]=
-h>>>24&255;this.c=l;B&&i<j.length&&(this.a=j=j.subarray(0,i));return j};var Ya=255,Ka=2,Ia=8,Ja=16;function W(c,a){this.p=[];this.q=32768;this.e=this.j=this.c=this.t=0;this.input=B?new Uint8Array(c):c;this.v=!1;this.r=Za;this.J=!1;if(a||!(a={}))a.index&&(this.c=a.index),a.bufferSize&&(this.q=a.bufferSize),a.bufferType&&(this.r=a.bufferType),a.resize&&(this.J=a.resize);switch(this.r){case $a:this.b=32768;this.a=new (B?Uint8Array:Array)(32768+this.q+258);break;case Za:this.b=0;this.a=new (B?Uint8Array:Array)(this.q);this.f=this.R;this.z=this.O;this.s=this.Q;break;default:m(Error("invalid inflate mode"))}}
-var $a=0,Za=1;
-W.prototype.i=function(){for(;!this.v;){var c=X(this,3);c&1&&(this.v=u);c>>>=1;switch(c){case 0:var a=this.input,b=this.c,e=this.a,f=this.b,d=r,g=r,h=r,j=e.length,i=r;this.e=this.j=0;d=a[b++];d===r&&m(Error("invalid uncompressed block header: LEN (first byte)"));g=d;d=a[b++];d===r&&m(Error("invalid uncompressed block header: LEN (second byte)"));g|=d<<8;d=a[b++];d===r&&m(Error("invalid uncompressed block header: NLEN (first byte)"));h=d;d=a[b++];d===r&&m(Error("invalid uncompressed block header: NLEN (second byte)"));h|=
-d<<8;g===~h&&m(Error("invalid uncompressed block header: length verify"));b+g>a.length&&m(Error("input buffer is broken"));switch(this.r){case $a:for(;f+g>e.length;){i=j-f;g-=i;if(B)e.set(a.subarray(b,b+i),f),f+=i,b+=i;else for(;i--;)e[f++]=a[b++];this.b=f;e=this.f();f=this.b}break;case Za:for(;f+g>e.length;)e=this.f({B:2});break;default:m(Error("invalid inflate mode"))}if(B)e.set(a.subarray(b,b+g),f),f+=g,b+=g;else for(;g--;)e[f++]=a[b++];this.c=b;this.b=f;this.a=e;break;case 1:this.s(ab,bb);break;
-case 2:cb(this);break;default:m(Error("unknown BTYPE: "+c))}}return this.z()};
-var db=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15],eb=B?new Uint16Array(db):db,fb=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258,258,258],gb=B?new Uint16Array(fb):fb,hb=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0,0,0],ib=B?new Uint8Array(hb):hb,jb=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577],kb=B?new Uint16Array(jb):jb,lb=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,
-10,11,11,12,12,13,13],mb=B?new Uint8Array(lb):lb,nb=new (B?Uint8Array:Array)(288),Y,ob;Y=0;for(ob=nb.length;Y<ob;++Y)nb[Y]=143>=Y?8:255>=Y?9:279>=Y?7:8;var ab=T(nb),pb=new (B?Uint8Array:Array)(30),qb,rb;qb=0;for(rb=pb.length;qb<rb;++qb)pb[qb]=5;var bb=T(pb);function X(c,a){for(var b=c.j,e=c.e,f=c.input,d=c.c,g;e<a;)g=f[d++],g===r&&m(Error("input buffer is broken")),b|=g<<e,e+=8;g=b&(1<<a)-1;c.j=b>>>a;c.e=e-a;c.c=d;return g}
-function sb(c,a){for(var b=c.j,e=c.e,f=c.input,d=c.c,g=a[0],h=a[1],j,i,q;e<h;)j=f[d++],j===r&&m(Error("input buffer is broken")),b|=j<<e,e+=8;i=g[b&(1<<h)-1];q=i>>>16;c.j=b>>q;c.e=e-q;c.c=d;return i&65535}
-function cb(c){function a(a,b,c){var d,f,e,g;for(g=0;g<a;)switch(d=sb(this,b),d){case 16:for(e=3+X(this,2);e--;)c[g++]=f;break;case 17:for(e=3+X(this,3);e--;)c[g++]=0;f=0;break;case 18:for(e=11+X(this,7);e--;)c[g++]=0;f=0;break;default:f=c[g++]=d}return c}var b=X(c,5)+257,e=X(c,5)+1,f=X(c,4)+4,d=new (B?Uint8Array:Array)(eb.length),g,h,j,i;for(i=0;i<f;++i)d[eb[i]]=X(c,3);g=T(d);h=new (B?Uint8Array:Array)(b);j=new (B?Uint8Array:Array)(e);c.s(T(a.call(c,b,g,h)),T(a.call(c,e,g,j)))}
-W.prototype.s=function(c,a){var b=this.a,e=this.b;this.A=c;for(var f=b.length-258,d,g,h,j;256!==(d=sb(this,c));)if(256>d)e>=f&&(this.b=e,b=this.f(),e=this.b),b[e++]=d;else{g=d-257;j=gb[g];0<ib[g]&&(j+=X(this,ib[g]));d=sb(this,a);h=kb[d];0<mb[d]&&(h+=X(this,mb[d]));e>=f&&(this.b=e,b=this.f(),e=this.b);for(;j--;)b[e]=b[e++-h]}for(;8<=this.e;)this.e-=8,this.c--;this.b=e};
-W.prototype.Q=function(c,a){var b=this.a,e=this.b;this.A=c;for(var f=b.length,d,g,h,j;256!==(d=sb(this,c));)if(256>d)e>=f&&(b=this.f(),f=b.length),b[e++]=d;else{g=d-257;j=gb[g];0<ib[g]&&(j+=X(this,ib[g]));d=sb(this,a);h=kb[d];0<mb[d]&&(h+=X(this,mb[d]));e+j>f&&(b=this.f(),f=b.length);for(;j--;)b[e]=b[e++-h]}for(;8<=this.e;)this.e-=8,this.c--;this.b=e};
-W.prototype.f=function(){var c=new (B?Uint8Array:Array)(this.b-32768),a=this.b-32768,b,e,f=this.a;if(B)c.set(f.subarray(32768,c.length));else{b=0;for(e=c.length;b<e;++b)c[b]=f[b+32768]}this.p.push(c);this.t+=c.length;if(B)f.set(f.subarray(a,a+32768));else for(b=0;32768>b;++b)f[b]=f[a+b];this.b=32768;return f};
-W.prototype.R=function(c){var a,b=this.input.length/this.c+1|0,e,f,d,g=this.input,h=this.a;c&&("number"===typeof c.B&&(b=c.B),"number"===typeof c.M&&(b+=c.M));2>b?(e=(g.length-this.c)/this.A[2],d=258*(e/2)|0,f=d<h.length?h.length+d:h.length<<1):f=h.length*b;B?(a=new Uint8Array(f),a.set(h)):a=h;return this.a=a};
-W.prototype.z=function(){var c=0,a=this.a,b=this.p,e,f=new (B?Uint8Array:Array)(this.t+(this.b-32768)),d,g,h,j;if(0===b.length)return B?this.a.subarray(32768,this.b):this.a.slice(32768,this.b);d=0;for(g=b.length;d<g;++d){e=b[d];h=0;for(j=e.length;h<j;++h)f[c++]=e[h]}d=32768;for(g=this.b;d<g;++d)f[c++]=a[d];this.p=[];return this.buffer=f};
-W.prototype.O=function(){var c,a=this.b;B?this.J?(c=new Uint8Array(a),c.set(this.a.subarray(0,a))):c=this.a.subarray(0,a):(this.a.length>a&&(this.a.length=a),c=this.a);return this.buffer=c};function tb(c){this.input=c;this.c=0;this.member=[]}
-tb.prototype.i=function(){for(var c=this.input.length;this.c<c;){var a=new na,b=r,e=r,f=r,d=r,g=r,h=r,j=r,i=r,q=r,l=this.input,k=this.c;a.C=l[k++];a.D=l[k++];(31!==a.C||139!==a.D)&&m(Error("invalid file signature:",a.C,a.D));a.w=l[k++];switch(a.w){case 8:break;default:m(Error("unknown compression method: "+a.w))}a.o=l[k++];i=l[k++]|l[k++]<<8|l[k++]<<16|l[k++]<<24;a.Z=new Date(1E3*i);a.aa=l[k++];a.$=l[k++];0<(a.o&4)&&(a.V=l[k++]|l[k++]<<8,k+=a.V);if(0<(a.o&Ia)){j=[];for(h=0;0<(g=l[k++]);)j[h++]=String.fromCharCode(g);
-a.name=j.join("")}if(0<(a.o&Ja)){j=[];for(h=0;0<(g=l[k++]);)j[h++]=String.fromCharCode(g);a.comment=j.join("")}0<(a.o&Ka)&&(a.P=S.k(l,0,k)&65535,a.P!==(l[k++]|l[k++]<<8)&&m(Error("invalid header crc16")));b=l[l.length-4]|l[l.length-3]<<8|l[l.length-2]<<16|l[l.length-1]<<24;l.length-k-4-4<512*b&&(d=b);e=new W(l,{index:k,bufferSize:d});a.data=f=e.i();k=e.c;a.X=q=(l[k++]|l[k++]<<8|l[k++]<<16|l[k++]<<24)>>>0;S.k(f)!==q&&m(Error("invalid CRC-32 checksum: 0x"+S.k(f).toString(16)+" / 0x"+q.toString(16)));
-a.Y=b=(l[k++]|l[k++]<<8|l[k++]<<16|l[k++]<<24)>>>0;(f.length&4294967295)!==b&&m(Error("invalid input size: "+(f.length&4294967295)+" / "+b));this.member.push(a);this.c=k}var p=this.member,t,v,x=0,F=0,w;t=0;for(v=p.length;t<v;++t)F+=p[t].data.length;if(B){w=new Uint8Array(F);for(t=0;t<v;++t)w.set(p[t].data,x),x+=p[t].data.length}else{w=[];for(t=0;t<v;++t)w[t]=p[t].data;w=Array.prototype.concat.apply([],w)}return w};function ub(c,a){var b,e;this.input=c;this.c=0;if(a||!(a={}))a.index&&(this.c=a.index),a.verify&&(this.U=a.verify);b=c[this.c++];e=c[this.c++];switch(b&15){case Ga:this.method=Ga;break;default:m(Error("unsupported compression method"))}0!==((b<<8)+e)%31&&m(Error("invalid fcheck flag:"+((b<<8)+e)%31));e&32&&m(Error("fdict flag is not supported"));this.I=new W(c,{index:this.c,bufferSize:a.bufferSize,bufferType:a.bufferType,resize:a.resize})}
-ub.prototype.i=function(){var c=this.input,a,b;a=this.I.i();this.c=this.I.c;this.U&&(b=(c[this.c++]<<24|c[this.c++]<<16|c[this.c++]<<8|c[this.c++])>>>0,b!==aa(a)&&m(Error("invalid adler-32 checksum")));return a};exports.deflate=vb;exports.deflateSync=wb;exports.inflate=xb;exports.inflateSync=yb;exports.gzip=zb;exports.gzipSync=Ab;exports.gunzip=Bb;exports.gunzipSync=Cb;function vb(c,a,b){process.nextTick(function(){var e,f;try{f=wb(c,b)}catch(d){e=d}a(e,f)})}function wb(c,a){var b;b=(new Ea(c)).h();a||(a={});return a.G?b:Db(b)}function xb(c,a,b){process.nextTick(function(){var e,f;try{f=yb(c,b)}catch(d){e=d}a(e,f)})}
-function yb(c,a){var b;c.subarray=c.slice;b=(new ub(c)).i();a||(a={});return a.noBuffer?b:Db(b)}function zb(c,a,b){process.nextTick(function(){var e,f;try{f=Ab(c,b)}catch(d){e=d}a(e,f)})}function Ab(c,a){var b;c.subarray=c.slice;b=(new Ha(c)).h();a||(a={});return a.G?b:Db(b)}function Bb(c,a,b){process.nextTick(function(){var e,f;try{f=Cb(c,b)}catch(d){e=d}a(e,f)})}function Cb(c,a){var b;c.subarray=c.slice;b=(new tb(c)).i();a||(a={});return a.G?b:Db(b)}
-function Db(c){var a=new Buffer(c.length),b,e;b=0;for(e=c.length;b<e;++b)a[b]=c[b];return a};var Eb=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];B&&new Uint16Array(Eb);var Fb=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258,258,258];B&&new Uint16Array(Fb);var Gb=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0,0,0];B&&new Uint8Array(Gb);var Hb=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];B&&new Uint16Array(Hb);
-var Ib=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];B&&new Uint8Array(Ib);var Jb=new (B?Uint8Array:Array)(288),$,Kb;$=0;for(Kb=Jb.length;$<Kb;++$)Jb[$]=143>=$?8:255>=$?9:279>=$?7:8;T(Jb);var Lb=new (B?Uint8Array:Array)(30),Mb,Nb;Mb=0;for(Nb=Lb.length;Mb<Nb;++Mb)Lb[Mb]=5;T(Lb);var Ga=8;}).call(this);
-
-})(require("__browserify_process"),require("__browserify_Buffer").Buffer)
-},{"__browserify_process":33,"__browserify_Buffer":40}],108:[function(require,module,exports){
+},{"zlib":147,"util":47,"./chunkstream":149,"__browserify_Buffer":44}],108:[function(require,module,exports){
 "use strict"
 
 module.exports = applyColorMap
@@ -29703,7 +29709,7 @@ function applyColorMap(array, options) {
   doColoring(out_colors[0], out_colors[1], out_colors[2], array, cmap, lo, hi)
   return ndarray(out, out_shape)
 }
-},{"colormap":155,"cwise/lib/wrapper":63,"ndarray":44,"ndarray-ops":70}],109:[function(require,module,exports){
+},{"colormap":155,"cwise/lib/wrapper":63,"ndarray":43,"ndarray-ops":70}],109:[function(require,module,exports){
 "use strict"
 
 var ndarray = require("ndarray")
@@ -29733,7 +29739,7 @@ module.exports = function luminance(a, b, c, d) {
   }
 }
 
-},{"cwise/lib/wrapper":63,"ndarray":44}],156:[function(require,module,exports){
+},{"cwise/lib/wrapper":63,"ndarray":43}],156:[function(require,module,exports){
 module.exports={"jet":[{"index":0,"rgb":[0,0,131]},{"index":0.125,"rgb":[0,60,170]},{"index":0.375,"rgb":[5,255,255]},{"index":0.625,"rgb":[255,255,0]},{"index":0.875,"rgb":[250,0,0]},{"index":1,"rgb":[128,0,0]}],"hsv":[{"index":0,"rgb":[255,0,0]},{"index":0.169,"rgb":[253,255,2]},{"index":0.173,"rgb":[247,255,2]},{"index":0.337,"rgb":[0,252,4]},{"index":0.341,"rgb":[0,252,10]},{"index":0.506,"rgb":[1,249,255]},{"index":0.671,"rgb":[2,0,253]},{"index":0.675,"rgb":[8,0,253]},{"index":0.839,"rgb":[255,0,251]},{"index":0.843,"rgb":[255,0,245]},{"index":1,"rgb":[255,0,6]}],"hot":[{"index":0,"rgb":[0,0,0]},{"index":0.3,"rgb":[230,0,0]},{"index":0.6,"rgb":[255,210,0]},{"index":1,"rgb":[255,255,255]}],"cool":[{"index":0,"rgb":[0,255,255]},{"index":1,"rgb":[255,0,255]}],"spring":[{"index":0,"rgb":[255,0,255]},{"index":1,"rgb":[255,255,0]}],"summer":[{"index":0,"rgb":[0,128,102]},{"index":1,"rgb":[255,255,102]}],"autumn":[{"index":0,"rgb":[255,0,0]},{"index":1,"rgb":[255,255,0]}],"winter":[{"index":0,"rgb":[0,0,255]},{"index":1,"rgb":[0,255,128]}],"bone":[{"index":0,"rgb":[0,0,0]},{"index":0.376,"rgb":[84,84,116]},{"index":0.753,"rgb":[169,200,200]},{"index":1,"rgb":[255,255,255]}],"copper":[{"index":0,"rgb":[0,0,0]},{"index":0.804,"rgb":[255,160,102]},{"index":1,"rgb":[255,199,127]}],"greys":[{"index":0,"rgb":[0,0,0]},{"index":1,"rgb":[255,255,255]}],"yignbu":[{"index":0,"rgb":[8,29,88]},{"index":0.125,"rgb":[37,52,148]},{"index":0.25,"rgb":[34,94,168]},{"index":0.375,"rgb":[29,145,192]},{"index":0.5,"rgb":[65,182,196]},{"index":0.625,"rgb":[127,205,187]},{"index":0.75,"rgb":[199,233,180]},{"index":0.875,"rgb":[237,248,217]},{"index":1,"rgb":[255,255,217]}],"greens":[{"index":0,"rgb":[0,68,27]},{"index":0.125,"rgb":[0,109,44]},{"index":0.25,"rgb":[35,139,69]},{"index":0.375,"rgb":[65,171,93]},{"index":0.5,"rgb":[116,196,118]},{"index":0.625,"rgb":[161,217,155]},{"index":0.75,"rgb":[199,233,192]},{"index":0.875,"rgb":[229,245,224]},{"index":1,"rgb":[247,252,245]}],"yiorrd":[{"index":0,"rgb":[128,0,38]},{"index":0.125,"rgb":[189,0,38]},{"index":0.25,"rgb":[227,26,28]},{"index":0.375,"rgb":[252,78,42]},{"index":0.5,"rgb":[253,141,60]},{"index":0.625,"rgb":[254,178,76]},{"index":0.75,"rgb":[254,217,118]},{"index":0.875,"rgb":[255,237,160]},{"index":1,"rgb":[255,255,204]}],"bluered":[{"index":0,"rgb":[0,0,255]},{"index":1,"rgb":[255,0,0]}],"rdbu":[{"index":0,"rgb":[5,10,172]},{"index":0.35,"rgb":[106,137,247]},{"index":0.5,"rgb":[190,190,190]},{"index":0.6,"rgb":[220,170,132]},{"index":0.7,"rgb":[230,145,90]},{"index":1,"rgb":[178,10,28]}],"picnic":[{"index":0,"rgb":[0,0,255]},{"index":0.1,"rgb":[51,153,255]},{"index":0.2,"rgb":[102,204,255]},{"index":0.3,"rgb":[153,204,255]},{"index":0.4,"rgb":[204,204,255]},{"index":0.5,"rgb":[255,255,255]},{"index":0.6,"rgb":[255,204,255]},{"index":0.7,"rgb":[255,153,255]},{"index":0.8,"rgb":[255,102,204]},{"index":0.9,"rgb":[255,102,102]},{"index":1,"rgb":[255,0,0]}],"rainbow":[{"index":0,"rgb":[150,0,90]},{"index":0.125,"rgb":[0,0,200]},{"index":0.25,"rgb":[0,25,255]},{"index":0.375,"rgb":[0,152,255]},{"index":0.5,"rgb":[44,255,150]},{"index":0.625,"rgb":[151,255,0]},{"index":0.75,"rgb":[255,234,0]},{"index":0.875,"rgb":[255,111,0]},{"index":1,"rgb":[255,0,0]}],"portland":[{"index":0,"rgb":[12,51,131]},{"index":0.25,"rgb":[10,136,186]},{"index":0.5,"rgb":[242,211,56]},{"index":0.75,"rgb":[242,143,56]},{"index":1,"rgb":[217,30,30]}],"blackbody":[{"index":0,"rgb":[0,0,0]},{"index":0.2,"rgb":[230,0,0]},{"index":0.4,"rgb":[230,210,0]},{"index":0.7,"rgb":[255,255,255]},{"index":1,"rgb":[160,200,255]}],"earth":[{"index":0,"rgb":[0,0,130]},{"index":0.1,"rgb":[0,180,180]},{"index":0.2,"rgb":[40,210,40]},{"index":0.4,"rgb":[230,230,50]},{"index":0.6,"rgb":[120,70,20]},{"index":1,"rgb":[255,255,255]}],"electric":[{"index":0,"rgb":[0,0,0]},{"index":0.15,"rgb":[30,0,100]},{"index":0.4,"rgb":[120,0,100]},{"index":0.6,"rgb":[160,90,0]},{"index":0.8,"rgb":[230,200,0]},{"index":1,"rgb":[255,250,220]}]}
 
 },{}],142:[function(require,module,exports){
@@ -30024,7 +30030,7 @@ function generateCWiseOp(proc, typesig) {
   return f()
 }
 module.exports = generateCWiseOp
-},{"uniq":157}],143:[function(require,module,exports){
+},{"uniq":157}],144:[function(require,module,exports){
 "use strict"
 
 var uniq = require("uniq")
@@ -30312,7 +30318,7 @@ function generateCWiseOp(proc, typesig) {
   return f()
 }
 module.exports = generateCWiseOp
-},{"uniq":158}],145:[function(require,module,exports){
+},{"uniq":158}],143:[function(require,module,exports){
 "use strict"
 
 var uniq = require("uniq")
@@ -30569,7 +30575,7 @@ function generateCWiseOp(proc, typesig) {
   return f()
 }
 module.exports = generateCWiseOp
-},{"uniq":159}],144:[function(require,module,exports){
+},{"uniq":159}],145:[function(require,module,exports){
 "use strict"
 
 var uniq = require("uniq")
