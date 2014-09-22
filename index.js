@@ -9,6 +9,8 @@ var url         = require('parsed-url')
 var listenDrop  = require('drag-and-drop-files')
 var createVolumeRenderer = require('./lib/viewer.js')
 
+var gifInput = document.querySelector("#gifurl")
+
 camera.lookAt([0,0,-5], [0,0,0], [0,-1,0])
 
 var viewer
@@ -40,6 +42,10 @@ shell.on("gl-init", function() {
     }
     reader.readAsDataURL(files[0])
   })
+
+  gifInput.onchange = function() {
+    loadVoxels(gifInput.value + '')
+  }
 })
 
 shell.on("gl-render", function() {
