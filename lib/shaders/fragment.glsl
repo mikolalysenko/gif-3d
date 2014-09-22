@@ -31,7 +31,9 @@ vec4 getVoxel(vec3 p) {
   float iz = floor(shape.z*fract(p.z/shape.z));
 
   //Read pixels
-  return w * texture2D(voxels, (coord + zcoords(iz)) / tshape);
+  vec4 voxel = texture2D(voxels, (coord + zcoords(iz)) / tshape);
+
+  return vec4(voxel.rgb*w, mix(1.0, voxel.a, w));
 }
 
 float rayStep(vec3 coordinate, vec3 direction) {
@@ -57,11 +59,15 @@ vec4 castRay(vec3 origin, vec3 direction) {
     //Calculate step
     float dt = rayStep(origin, direction);
     
-    //Update color
+    //Read voxel
     vec4 ci = getVoxel(origin);
-    c = over(c, vec4(ci.rgb, alphaWeight(ci.a, dt)));
 
-    origin += direction * dt;
+    //Update color
+    float alpha = step(0.0, -ci.a);
+    c = over(c, vec4(ci.rgb, alphaWeight(alpha, dt)));
+
+    //March ray
+    origin += direction * max(dt, 128.0*ci.a-2.0);
   }
   return c;
 }
