@@ -1,6 +1,6 @@
 'use strict'
 
-var shell       = require('gl-now')()
+var shell       = require('gl-now')({ tickRate: 1 })
 var camera      = require('game-shell-orbit-camera')(shell)
 var getPixels   = require('get-pixels')
 var mat4        = require('gl-mat4')
@@ -8,8 +8,6 @@ var now         = require('right-now')
 var url         = require('parsed-url')
 var listenDrop  = require('drag-and-drop-files')
 var createVolumeRenderer = require('./lib/viewer.js')
-
-var gifInput = document.querySelector("#gifurl")
 
 camera.lookAt([0,0,-5], [0,0,0], [0,-1,0])
 
@@ -42,10 +40,6 @@ shell.on("gl-init", function() {
     }
     reader.readAsDataURL(files[0])
   })
-
-  gifInput.onchange = function() {
-    loadVoxels(gifInput.value + '')
-  }
 })
 
 shell.on("gl-render", function() {
